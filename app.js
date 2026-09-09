@@ -1,6 +1,6 @@
 // App state
 const state = {
-  view: "read", // "read" | "characters" | "notes"
+  view: "dashboard", // "dashboard" | "read" | "characters" | "notes"
   book: "Genesis",
   chapter: 1,
   translation: "web",
@@ -186,7 +186,15 @@ function render() {
   app.innerHTML = `
     ${renderHeader()}
     <main>
-      ${state.view === "read" ? renderReadView() : state.view === "characters" ? renderCharactersView() : renderNotesView()}
+      ${
+        state.view === "dashboard"
+          ? renderDashboardView()
+          : state.view === "read"
+          ? renderReadView()
+          : state.view === "characters"
+          ? renderCharactersView()
+          : renderNotesView()
+      }
     </main>
     <footer class="app-footer">
       Scripture text: ${escapeHtml(translationName(state.translation))} (public domain) via bible-api.com. Notes stay in this browser only.
@@ -214,6 +222,7 @@ function renderHeader() {
       <div class="top-row">
         <div class="brand">📖 Verse by Verse</div>
         <div class="nav-links">
+          <button data-nav="dashboard" class="${state.view === "dashboard" ? "active" : ""}">Dashboard</button>
           <button data-nav="read" class="${state.view === "read" ? "active" : ""}">Read</button>
           <button data-nav="characters" class="${state.view === "characters" ? "active" : ""}">Characters</button>
           <button data-nav="notes" class="${state.view === "notes" ? "active" : ""}">My Notes</button>
@@ -265,6 +274,86 @@ function renderHeaderProgress() {
         <span class="mini-bar-value">${quizStats.sumBestTotal > 0 ? quizStats.percentage + "%" : "—"}</span>
       </div>
     </div>
+  `;
+}
+
+// ---------- Dashboard (landing page) ----------
+
+function renderDashboardView() {
+  const last = Store.getLastPosition();
+  const lastBook = bookByName(last.book) || BIBLE_BOOKS[0];
+  const bookReadCounts = Store.getReadCountsByBook();
+  const lastBookRead = bookReadCounts[lastBook.name] || 0;
+  const lastBookPct = Math.round((lastBookRead / lastBook.chapters) * 100);
+
+  const quizStats = Store.getOverallQuizStats();
+
+  const readCount = Store.getReadCount();
+  const annotatedChapters = Store.getAnnotatedChapterCount();
+  const notesPct = readCount > 0 ? Math.round((annotatedChapters / readCount) * 100) : 0;
+
+  const continueRing = renderDashRingButton({
+    action: "continue",
+    percent: lastBookPct,
+    centerText: `${lastBookPct}%`,
+    colorClass: "ring-continue",
+    heading: `${escapeHtml(last.book)} ${last.chapter}`,
+    caption: "Continue Reading",
+  });
+
+  const quizRing = renderDashRingButton({
+    action: "quiz",
+    percent: quizStats.percentage,
+    centerText: quizStats.sumBestTotal > 0 ? `${quizStats.percentage}%` : "—",
+    colorClass: "ring-quiz",
+    heading: "Quiz Score",
+    caption:
+      quizStats.chaptersQuizzed > 0
+        ? `${quizStats.chaptersQuizzed} chapter${quizStats.chaptersQuizzed === 1 ? "" : "s"} quizzed`
+        : "No quizzes yet",
+  });
+
+  const notesRing = renderDashRingButton({
+    action: "notes",
+    percent: notesPct,
+    centerText: readCount > 0 ? `${notesPct}%` : "—",
+    colorClass: "ring-notes",
+    heading: "Notes &amp; Highlights",
+    caption: `${annotatedChapters} chapter${annotatedChapters === 1 ? "" : "s"} annotated`,
+  });
+
+  return `
+    <div class="dashboard-view">
+      <h1 class="dashboard-title">Welcome back</h1>
+      <p class="dashboard-sub">Here's your progress at a glance.</p>
+      <div class="dash-ring-row">
+        ${continueRing}
+        ${quizRing}
+        ${notesRing}
+      </div>
+    </div>
+  `;
+}
+
+function renderDashRingButton({ action, percent, centerText, colorClass, heading, caption }) {
+  const r = 45;
+  const circumference = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(100, percent || 0));
+  const offset = circumference * (1 - clamped / 100);
+
+  return `
+    <button class="dash-ring-btn" data-dash-action="${action}">
+      <div class="ring-wrap">
+        <svg viewBox="0 0 100 100" class="ring-svg">
+          <circle class="ring-track" cx="50" cy="50" r="${r}"></circle>
+          <circle class="ring-fill ${colorClass}" cx="50" cy="50" r="${r}"
+            stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"></circle>
+        </svg>
+        <div class="ring-center">${escapeHtml(centerText)}</div>
+      </div>
+      <div class="dash-ring-heading">${heading}</div>
+      <div class="dash-ring-caption">${escapeHtml(caption)}</div>
+    </button>
   `;
 }
 
@@ -747,6 +836,25 @@ function attachHandlers() {
     btn.addEventListener("click", () => {
       state.view = btn.dataset.nav;
       render();
+    });
+  });
+
+  document.querySelectorAll("[data-dash-action]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.dashAction;
+      if (action === "continue") {
+        const last = Store.getLastPosition();
+        state.view = "read";
+        goToChapter(last.book, last.chapter, last.translation);
+      } else if (action === "quiz") {
+        state.view = "notes";
+        state.notesTab = "quiz";
+        render();
+      } else if (action === "notes") {
+        state.view = "notes";
+        state.notesTab = "verses";
+        render();
+      }
     });
   });
 

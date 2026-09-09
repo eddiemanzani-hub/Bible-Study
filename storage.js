@@ -296,6 +296,19 @@ const Store = {
       .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   },
 
+  // Number of distinct chapters that have at least one note or highlight
+  // (used for the dashboard's "Notes" progress ring).
+  getAnnotatedChapterCount() {
+    const all = this.getAllVerseData();
+    const chapters = new Set();
+    Object.keys(all).forEach((key) => {
+      const parts = key.split(":");
+      parts.pop(); // verse
+      chapters.add(parts.join(":")); // "Book:Chapter"
+    });
+    return chapters.size;
+  },
+
   exportAll() {
     return {
       verseData: this.getAllVerseData(),
