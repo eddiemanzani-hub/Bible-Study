@@ -34,7 +34,6 @@ const state = {
   narratorActive: false, // a chapter reading session is in progress (playing or paused)
   narratorPlaying: false, // actively speaking right now (vs. paused)
   narratorParagraphIndex: 0, // which paragraph of the current chapter is playing
-  narratorVoiceIndex: Number(localStorage.getItem("bsa:narratorVoiceIndex")) || 0, // 0/1/2
   progressCollapsed: localStorage.getItem("bsa:progressCollapsed") === "true",
   showSettings: false,
   readingFontSize: savedReadingSettings.fontSize || "md", // "sm" | "md" | "lg" | "xl"
@@ -549,15 +548,14 @@ function renderDashRingButton({ action, percent, centerText, colorClass, heading
 // ---------- Narrator (read-aloud via the browser's built-in text-to-speech) ----------
 
 const SPEECH_SUPPORTED = "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined";
-let narratorVoices = []; // up to 3 SpeechSynthesisVoice objects the user can pick between
+let narratorVoices = []; // [0] holds the single voice used for narration
 
 function loadNarratorVoices() {
   if (!SPEECH_SUPPORTED) return;
   const all = window.speechSynthesis.getVoices();
   if (!all.length) return; // not ready yet; onvoiceschanged will retry
   const english = all.filter((v) => v.lang && v.lang.toLowerCase().startsWith("en"));
-  const pool = (english.length ? english : all).slice(0, 3);
-  narratorVoices = pool;
+  narratorVoices = (english.length ? english : all).slice(0, 1);
   if (state.view === "read") render();
 }
 
@@ -583,7 +581,7 @@ function speakParagraph(index) {
 
   const text = paragraphs[index].map((v) => v.text).join(" ");
   const utter = new SpeechSynthesisUtterance(text);
-  const voice = narratorVoices[state.narratorVoiceIndex];
+  const voice = narratorVoices[0];
   if (voice) utter.voice = voice;
   utter.onend = () => {
     // Only auto-advance if this utterance wasn't cut off by cancel()/stop/skip.
@@ -629,28 +627,8 @@ function narratorNextParagraph() {
   speakParagraph(state.narratorParagraphIndex + 1);
 }
 
-function selectNarratorVoice(index) {
-  state.narratorVoiceIndex = index;
-  localStorage.setItem("bsa:narratorVoiceIndex", String(index));
-  if (state.narratorActive) {
-    speakParagraph(state.narratorParagraphIndex); // restart current paragraph in the new voice
-  } else {
-    render();
-  }
-}
-
 function renderNarratorBar() {
   if (!SPEECH_SUPPORTED) return "";
-
-  const voiceButtons = [0, 1, 2]
-    .map((i) => {
-      const has = !!narratorVoices[i];
-      const active = state.narratorVoiceIndex === i;
-      return `<button class="narrator-voice-btn ${active ? "active" : ""}" data-narrator-voice="${i}" ${
-        has ? "" : "disabled"
-      } title="${has ? escapeHtml(narratorVoices[i].name) : "Not available on this device"}">Voice ${i + 1}</button>`;
-    })
-    .join("");
 
   const playPauseLabel = !state.narratorActive ? "Read Aloud" : state.narratorPlaying ? "Pause" : "Resume";
   const playPauseIcon = state.narratorActive && state.narratorPlaying ? "⏸" : "▶";
@@ -670,10 +648,6 @@ function renderNarratorBar() {
                <button class="narrator-btn" data-narrator-action="stop" title="Stop">⏹</button>`
             : ""
         }
-      </div>
-      <div class="narrator-voices">
-        <span class="narrator-voices-label">Voice:</span>
-        ${voiceButtons}
       </div>
     </div>
   `;
@@ -1172,10 +1146,6 @@ function attachHandlers() {
         render();
       }
     });
-  });
-
-  document.querySelectorAll("[data-narrator-voice]").forEach((btn) => {
-    btn.addEventListener("click", () => selectNarratorVoice(Number(btn.dataset.narratorVoice)));
   });
 
   const settingsOpenBtn = document.querySelector("[data-settings-open]");

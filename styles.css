@@ -280,40 +280,6 @@ h1.chapter-title {
   font-weight: 600;
 }
 
-.narrator-voices {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.narrator-voices-label {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  margin-right: 2px;
-}
-
-.narrator-voice-btn {
-  border: 1px solid var(--border);
-  background: none;
-  color: var(--text);
-  border-radius: 999px;
-  padding: 5px 11px;
-  cursor: pointer;
-  font-size: 0.78rem;
-  font-family: inherit;
-}
-
-.narrator-voice-btn.active {
-  background: var(--accent);
-  color: var(--accent-contrast);
-  border-color: var(--accent);
-}
-
-.narrator-voice-btn:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
 /* Dashboard (landing page) */
 .dashboard-view {
   padding: 8px 0 40px;
