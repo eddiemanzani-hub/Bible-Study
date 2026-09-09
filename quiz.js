@@ -1,67 +1,10 @@
-// Generates 5 multiple-choice questions straight from the chapter's own verse
-// text -- no external question bank or AI call needed. Each question is built
-// by swapping a verse's own person/place/important-term word for the matching
-// question word (Who/Where/What) right where it sits in the sentence, so it
-// reads as a real question rather than a "fill in the blank" excerpt.
-//
-// Note on scope: true "why did X happen" causal questions would require
-// actually reasoning about the text (an AI's job, not a heuristic's), so
-// there's no "Why" category here -- important-term answers use "What" instead.
-//
+// Generates 5 multiple-choice "fill in the blank" questions straight from the
+// chapter's own verse text -- no external question bank or AI call needed.
 // Questions are steered toward people, places, and theologically significant
 // terms rather than arbitrary vocabulary (see categorizeWord below).
 // Generation is seeded (hash of translation+book+chapter+verse+word) so the
 // same chapter always produces the same questions, options in the same order,
 // letting a user's score stay meaningful across visits.
-
-// Which question word replaces the answer, by its category.
-const WH_WORD_BY_KIND = {
-  person: "Who",
-  place: "Where",
-  important: "What",
-  proper: "What",
-  other: "What",
-};
-
-// Finds the boundaries of just the sentence containing `index` within a
-// (possibly multi-sentence) verse, so a verse like "So Abram went, as Yahweh
-// had told him. Lot went with him. Abram was..." turns into the clean
-// question "Who went with him?" instead of merging all three sentences.
-function sentenceBoundsAround(text, index) {
-  let start = 0;
-  for (let i = index - 1; i >= 0; i--) {
-    if (/[.!?]/.test(text[i])) {
-      start = i + 1;
-      break;
-    }
-  }
-  while (start < index && /[\s"'‘’“”]/.test(text[start])) start++;
-
-  let end = text.length;
-  for (let i = index; i < text.length; i++) {
-    if (/[.!?]/.test(text[i])) {
-      end = i;
-      break;
-    }
-  }
-  return { start, end };
-}
-
-// Turns a verse sentence into a question by swapping the answer word for its
-// question word right in place (e.g. "Abram went to Canaan." -> "Abram went
-// to where?" / "God created the earth." -> "Who created the earth?"), rather
-// than showing the sentence with a blank to fill in.
-function buildQuestionPrompt(text, candidate, whWord) {
-  const { start, end } = sentenceBoundsAround(text, candidate.index);
-  const atSentenceStart = candidate.index === start;
-
-  const before = text.slice(start, candidate.index);
-  let after = text.slice(candidate.index + candidate.length, end);
-  after = after.replace(/[\s.,;:!?"'‘’“”]+$/, "");
-
-  const whToken = atSentenceStart ? whWord : whWord.toLowerCase();
-  return `${before}${whToken}${after}?`;
-}
 
 function hashStr(str) {
   let h = 2166136261;
@@ -130,29 +73,15 @@ function isSentenceStart(text, index) {
   return /[.!?]/.test(text[i]);
 }
 
-// True if `word` is immediately preceded by "to " (e.g. "to mark", "to
-// divide") -- a strong signal it's an infinitive verb, not a noun. Swapping
-// a verb for "who/where/what" breaks the sentence ("...signs to what
-// seasons" instead of "...signs to mark"), so words like this are only ever
-// safe to use in the curated person/place/important-term categories, never
-// as the generic last-resort fallback.
-function precededByTo(text, index) {
-  let i = index - 1;
-  while (i >= 0 && text[i] === " ") i--;
-  return i >= 1 && text[i] === "o" && text[i - 1] === "t" && (i - 2 < 0 || /\s/.test(text[i - 2]));
-}
-
 // Category ranks: 1 = known person, 2 = known place, 3 = important term,
 // 4 = unrecognized but capitalized mid-sentence (likely a name/place anyway),
 // 5 = generic content word (last-resort fallback so a quiz can still be built).
-// Returns null when a word isn't safe to use as a question's answer at all.
 function categorizeWord(word, text, index) {
   const lower = word.toLowerCase();
   if (QUIZ_PERSON_TOKENS.has(lower)) return { rank: 1, kind: "person" };
   if (QUIZ_PLACE_SET.has(lower)) return { rank: 2, kind: "place" };
   if (QUIZ_IMPORTANT_SET.has(lower)) return { rank: 3, kind: "important" };
   if (/^[A-Z]/.test(word) && !isSentenceStart(text, index)) return { rank: 4, kind: "proper" };
-  if (precededByTo(text, index)) return null;
   return { rank: 5, kind: "other" };
 }
 
@@ -163,8 +92,8 @@ function findCandidates(text) {
   let m;
   while ((m = re.exec(text))) {
     if (isContentWord(m[0])) {
-      const categorized = categorizeWord(m[0], text, m.index);
-      if (categorized) out.push({ word: m[0], index: m.index, length: m[0].length, ...categorized });
+      const { rank, kind } = categorizeWord(m[0], text, m.index);
+      out.push({ word: m[0], index: m.index, length: m[0].length, rank, kind });
     }
   }
   return out;
@@ -238,8 +167,8 @@ function generateQuiz(translation, book, chapter, verses) {
   return picks.map((pick, qIndex) => {
     const { verseEntry, candidate } = pick;
     const correctWord = candidate.word;
-    const whWord = WH_WORD_BY_KIND[candidate.kind] || "What";
-    const prompt = buildQuestionPrompt(verseEntry.text, candidate, whWord);
+    const prompt =
+      verseEntry.text.slice(0, candidate.index) + "_____" + verseEntry.text.slice(candidate.index + candidate.length);
 
     // Prefer distractors from the same category, then widen the net.
     const kindOrder = [candidate.kind, "person", "place", "important", "proper", "other"];
