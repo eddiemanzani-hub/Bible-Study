@@ -25,6 +25,7 @@ const state = {
   narratorPlaying: false, // actively speaking right now (vs. paused)
   narratorParagraphIndex: 0, // which paragraph of the current chapter is playing
   narratorVoiceIndex: Number(localStorage.getItem("bsa:narratorVoiceIndex")) || 0, // 0/1/2
+  progressCollapsed: localStorage.getItem("bsa:progressCollapsed") === "true",
 };
 
 const debounceTimers = {};
@@ -332,9 +333,17 @@ function renderHeaderProgress() {
   const overallPct = Math.round((overallRead / TOTAL_CHAPTERS) * 100);
 
   const quizStats = Store.getOverallQuizStats();
+  const collapsed = state.progressCollapsed;
 
   return `
-    <div class="header-progress">
+    <div class="header-progress ${collapsed ? "collapsed" : ""}">
+      <button class="progress-toggle-btn" data-progress-toggle title="${collapsed ? "Show" : "Hide"} progress bars">
+        <span class="progress-toggle-caret">${collapsed ? "▸" : "▾"}</span> ${collapsed ? "Show progress" : "Hide progress"}
+      </button>
+      ${
+        collapsed
+          ? ""
+          : `
       <div class="mini-bar-row" title="${bookRead} of ${currentBook.chapters} chapters completed (quiz finished) in ${escapeHtml(currentBook.name)}">
         <span class="mini-bar-label">${escapeHtml(currentBook.name)}</span>
         <div class="mini-bar-track"><div class="mini-bar-fill read-fill" style="width:${bookPct}%"></div></div>
@@ -349,9 +358,16 @@ function renderHeaderProgress() {
         <span class="mini-bar-label">Quiz score</span>
         <div class="mini-bar-track"><div class="mini-bar-fill quiz-fill" style="width:${quizStats.percentage}%"></div></div>
         <span class="mini-bar-value">${quizStats.sumBestTotal > 0 ? quizStats.percentage + "%" : "—"}</span>
-      </div>
+      </div>`
+      }
     </div>
   `;
+}
+
+function toggleProgressCollapsed() {
+  state.progressCollapsed = !state.progressCollapsed;
+  localStorage.setItem("bsa:progressCollapsed", String(state.progressCollapsed));
+  render();
 }
 
 // ---------- Dashboard (landing page) ----------
@@ -1046,6 +1062,9 @@ function renderProgressTab() {
 // ---------- Event wiring ----------
 
 function attachHandlers() {
+  const progressToggleBtn = document.querySelector("[data-progress-toggle]");
+  if (progressToggleBtn) progressToggleBtn.addEventListener("click", toggleProgressCollapsed);
+
   document.querySelectorAll("[data-narrator-action]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const action = btn.dataset.narratorAction;
