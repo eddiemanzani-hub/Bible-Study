@@ -43,6 +43,12 @@ html, body {
   color: var(--text);
   font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
   line-height: 1.6;
+  /* The collapsing header (see header.top-bar) intentionally shrinks while
+     the user is scrolled into a chapter. Without this, the browser's scroll
+     anchoring "corrects" for that layout shift by silently changing the
+     scroll position itself, which fires more scroll events and can
+     re-trigger the collapse threshold -- producing a visible bounce. */
+  overflow-anchor: none;
 }
 
 body { min-height: 100vh; }
@@ -67,6 +73,12 @@ header.top-bar {
   border-bottom: 1px solid var(--border);
   z-index: 10;
   transition: padding 0.25s ease;
+  /* Without this, the browser's scroll anchoring "helpfully" compensates for
+     the header shrinking by silently adjusting window.scrollY to keep the
+     content under it visually still -- which fires more scroll events,
+     which can re-trigger the collapse/expand threshold and bounce. The
+     header's own size change should never move the user's scroll position. */
+  overflow-anchor: none;
 }
 
 header.top-bar.scrolled {
