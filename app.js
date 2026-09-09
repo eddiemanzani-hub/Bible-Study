@@ -316,7 +316,7 @@ function renderDashboardView() {
   const notesRing = renderDashRingButton({
     action: "notes",
     percent: notesPct,
-    centerText: readCount > 0 ? `${notesPct}%` : "—",
+    centerText: "📝",
     colorClass: "ring-notes",
     heading: "Notes &amp; Highlights",
     caption: `${annotatedChapters} chapter${annotatedChapters === 1 ? "" : "s"} annotated`,
