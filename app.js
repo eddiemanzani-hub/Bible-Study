@@ -207,6 +207,12 @@ function escapeHtml(str) {
 
 // ---------- Rendering ----------
 
+// Whether the sticky header is in its scrolled-past-the-top, collapsed form.
+// Lives outside `state` (and isn't re-derived on every render) because it's
+// driven by a scroll listener that must NOT trigger a full re-render on every
+// tick -- see handleHeaderScroll below.
+let headerScrolled = false;
+
 function render() {
   const app = document.getElementById("app");
   app.innerHTML = `
@@ -229,6 +235,32 @@ function render() {
     </footer>
   `;
   attachHandlers();
+  updateHeaderHeightVar();
+}
+
+// Keeps --header-h in sync with the sticky header's actual rendered height, so
+// the narrator bar (position: sticky, see styles.css) always docks directly
+// under it -- whether the header is expanded or scroll-collapsed.
+function updateHeaderHeightVar() {
+  const header = document.querySelector("header.top-bar");
+  if (header) document.documentElement.style.setProperty("--header-h", `${header.offsetHeight}px`);
+}
+
+// Collapses the header to a compact bar once the user scrolls a bit into the
+// chapter, freeing screen space for reading; expands again near the top.
+// Toggles the class directly (no render()) so scrolling stays smooth.
+function handleHeaderScroll() {
+  const shouldCollapse = window.scrollY > 40;
+  if (shouldCollapse !== headerScrolled) {
+    headerScrolled = shouldCollapse;
+    document.querySelector("header.top-bar")?.classList.toggle("scrolled", headerScrolled);
+    // The collapse/expand is animated (see .top-bar transitions in
+    // styles.css), so the header's offsetHeight right after the class flip
+    // is still mid-transition -- resync --header-h once it settles so the
+    // sticky narrator bar doesn't overlap the fully-expanded header.
+    setTimeout(updateHeaderHeightVar, 260);
+  }
+  updateHeaderHeightVar();
 }
 
 // ---------- Verse of the Day (welcome overlay) ----------
@@ -391,7 +423,7 @@ function renderHeader() {
   ).join("");
 
   return `
-    <header class="top-bar">
+    <header class="top-bar${headerScrolled ? " scrolled" : ""}">
       <div class="top-row">
         <div class="brand">📖 Verse by Verse</div>
         <button class="settings-btn" data-settings-open title="Reading settings" aria-label="Reading settings">⚙</button>
@@ -1629,4 +1661,9 @@ function positionDictPopup(rect) {
     loadNarratorVoices();
     window.speechSynthesis.onvoiceschanged = loadNarratorVoices;
   }
+  window.addEventListener("scroll", handleHeaderScroll, { passive: true });
+  window.addEventListener("resize", updateHeaderHeightVar);
+  document.addEventListener("transitionend", (e) => {
+    if (e.target.closest && e.target.closest("header.top-bar")) updateHeaderHeightVar();
+  });
 })();
