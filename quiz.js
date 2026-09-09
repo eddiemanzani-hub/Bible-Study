@@ -116,29 +116,34 @@ function collectDistinctWords(perVerse) {
   return Array.from(byWord.values());
 }
 
+// Maps each verse number to its reading-paragraph index (same grouping the
+// Read view uses), so the quiz can avoid picking two questions that would
+// land in the same paragraph on the page.
+function buildParagraphIndex(verses) {
+  const map = new Map();
+  verses.forEach((v, i) => map.set(v.verse, Math.floor(i / CHAPTER_PARAGRAPH_SIZE)));
+  return map;
+}
+
 // Picks up to `want` distinct-word entries, preferring the lowest-rank
-// (most important) category first and spreading picks across the chapter
-// within each tier, then filling any remaining slots from the next tier.
-function pickDistinctWordsByTier(entries, want) {
+// (most important) category first, scanning each tier in verse order and
+// taking the first candidate from each not-yet-used paragraph -- so, within
+// the limits of what's available, no two questions come from the same
+// paragraph, and picks still end up spread across the chapter.
+function pickDistinctWordsByTier(entries, want, paragraphIndex) {
   const maxRank = Math.max(...entries.map((e) => e.candidate.rank));
   const picked = [];
+  const usedParagraphs = new Set();
 
   for (let tier = 1; tier <= maxRank && picked.length < want; tier++) {
     const pool = entries.filter((e) => e.candidate.rank === tier).sort((a, b) => a.verse - b.verse);
-    if (!pool.length) continue;
-    const remaining = want - picked.length;
-    const n = pool.length;
-    const count = Math.min(remaining, n);
-    const idxs =
-      count >= n
-        ? pool.map((_, i) => i)
-        : Array.from({ length: count }, (_, i) => Math.floor((i * (n - 1)) / Math.max(count - 1, 1)));
-    const seen = new Set();
-    idxs.forEach((idx) => {
-      if (seen.has(idx)) return;
-      seen.add(idx);
-      picked.push(pool[idx]);
-    });
+    for (const entry of pool) {
+      if (picked.length >= want) break;
+      const p = paragraphIndex.get(entry.verse);
+      if (usedParagraphs.has(p)) continue;
+      usedParagraphs.add(p);
+      picked.push(entry);
+    }
   }
   return picked;
 }
@@ -162,7 +167,8 @@ function generateQuiz(translation, book, chapter, verses) {
   // One entry per distinct word in the chapter (not per verse), so a
   // frequently repeated word like "God" doesn't become every question.
   const distinctWords = collectDistinctWords(perVerse);
-  const picks = pickDistinctWordsByTier(distinctWords, 5);
+  const paragraphIndex = buildParagraphIndex(verses);
+  const picks = pickDistinctWordsByTier(distinctWords, 5, paragraphIndex);
 
   return picks.map((pick, qIndex) => {
     const { verseEntry, candidate } = pick;

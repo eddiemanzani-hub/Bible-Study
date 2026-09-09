@@ -567,7 +567,7 @@ function stopNarrator() {
 
 function speakParagraph(index) {
   if (!SPEECH_SUPPORTED) return;
-  const paragraphs = chunkVersesIntoParagraphs(state.verses, 6);
+  const paragraphs = chunkVersesIntoParagraphs(state.verses, CHAPTER_PARAGRAPH_SIZE);
   if (index < 0 || index >= paragraphs.length || !paragraphs.length) {
     stopNarrator();
     render();
@@ -684,7 +684,7 @@ function renderReadView() {
     return `<p class="error-msg">${escapeHtml(state.error)}</p>`;
   }
 
-  const paragraphs = chunkVersesIntoParagraphs(state.verses, 6);
+  const paragraphs = chunkVersesIntoParagraphs(state.verses, CHAPTER_PARAGRAPH_SIZE);
   const paragraphsHtml = paragraphs.map((group, i) => renderParagraph(group, i)).join("");
 
   return `

@@ -74,6 +74,11 @@ const BIBLE_BOOKS = [
 // Total chapters across the whole 66-book canon (used for the reading progress bar).
 const TOTAL_CHAPTERS = BIBLE_BOOKS.reduce((sum, b) => sum + b.chapters, 0);
 
+// Verses per reading paragraph, shared by the reading layout (app.js) and the
+// quiz generator (quiz.js, which avoids picking two questions from the same
+// paragraph) so both agree on where paragraph boundaries fall.
+const CHAPTER_PARAGRAPH_SIZE = 6;
+
 // Public-domain translations hosted by bible-api.com (no API key required).
 const TRANSLATIONS = [
   { id: "web", name: "World English Bible (WEB)" },
