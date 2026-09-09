@@ -254,8 +254,8 @@ function renderHeaderProgress() {
         <div class="mini-bar-track"><div class="mini-bar-fill read-fill" style="width:${bookPct}%"></div></div>
         <span class="mini-bar-value">${bookPct}% <small>(${bookRead}/${currentBook.chapters})</small></span>
       </div>
-      <div class="mini-bar-row" title="${overallRead} of ${TOTAL_CHAPTERS} chapters completed (quiz finished) across the whole Bible">
-        <span class="mini-bar-label">Whole Bible</span>
+      <div class="mini-bar-row" title="${overallRead} of ${TOTAL_CHAPTERS} chapters completed (quiz finished) across the Bible">
+        <span class="mini-bar-label">Bible</span>
         <div class="mini-bar-track"><div class="mini-bar-fill read-fill" style="width:${overallPct}%"></div></div>
         <span class="mini-bar-value">${overallPct}% <small>(${overallRead}/${TOTAL_CHAPTERS})</small></span>
       </div>
