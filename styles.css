@@ -1086,3 +1086,114 @@ footer.app-footer {
   color: var(--text-muted);
   text-align: right;
 }
+
+/* Verse of the Day welcome overlay */
+.votd-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.votd-card {
+  position: relative;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  max-width: 460px;
+  width: 100%;
+  padding: 36px 28px 28px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.votd-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.votd-close:hover { color: var(--text); }
+
+.votd-welcome {
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  margin-bottom: 6px;
+}
+
+.votd-label {
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--accent);
+  margin: 0 0 22px;
+}
+
+.votd-text {
+  font-size: 1.35rem;
+  line-height: 1.6;
+  font-style: italic;
+  margin: 0 0 14px;
+}
+
+.votd-ref {
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  margin: 0 0 28px;
+}
+
+.votd-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.votd-find-btn,
+.votd-continue-btn {
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: 999px;
+  padding: 11px 22px;
+  cursor: pointer;
+}
+
+.votd-find-btn {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+}
+
+.votd-continue-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.votd-continue-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.votd-loading {
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-style: italic;
+  color: var(--text-muted);
+  padding: 20px 0;
+  margin: 0;
+}

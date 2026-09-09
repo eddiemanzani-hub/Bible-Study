@@ -18,6 +18,9 @@ const state = {
   commentaryFor: null, // "book:chapter" the loaded commentary belongs to
   commentaryLoading: false,
   commentaryError: null,
+  showVerseOfDay: true,
+  votd: null, // { book, chapter, verse, text } once loaded
+  votdLoading: true,
 };
 
 const debounceTimers = {};
@@ -184,6 +187,7 @@ function escapeHtml(str) {
 function render() {
   const app = document.getElementById("app");
   app.innerHTML = `
+    ${state.showVerseOfDay ? renderVerseOfDayOverlay() : ""}
     ${renderHeader()}
     <main>
       ${
@@ -201,6 +205,74 @@ function render() {
     </footer>
   `;
   attachHandlers();
+}
+
+// ---------- Verse of the Day (welcome overlay) ----------
+
+function pickVerseOfDayRef() {
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((now - startOfYear) / 86400000);
+  return VERSE_OF_DAY_REFS[dayOfYear % VERSE_OF_DAY_REFS.length];
+}
+
+async function loadVerseOfDay() {
+  const ref = pickVerseOfDayRef();
+  try {
+    const verses = await BibleApi.fetchChapter(ref.book, ref.chapter, state.translation || "web");
+    const v = verses.find((x) => x.verse === ref.verse);
+    state.votd = v ? { book: ref.book, chapter: ref.chapter, verse: ref.verse, text: v.text } : null;
+  } catch (err) {
+    state.votd = null;
+  } finally {
+    state.votdLoading = false;
+    render();
+  }
+}
+
+function closeVerseOfDay() {
+  state.showVerseOfDay = false;
+  render();
+}
+
+function goToVerseOfDay() {
+  if (!state.votd) return;
+  const { book, chapter, verse } = state.votd;
+  state.showVerseOfDay = false;
+  state.view = "read";
+  loadChapter(book, chapter, state.translation).then(() => {
+    document.querySelector(`.verse-text[data-verse="${verse}"]`)?.scrollIntoView({ block: "center" });
+  });
+}
+
+function renderVerseOfDayOverlay() {
+  let inner;
+  if (state.votdLoading) {
+    inner = `<p class="votd-loading">Loading today's verse…</p>`;
+  } else if (!state.votd) {
+    inner = `<p class="votd-loading">Couldn't load today's verse right now.</p>`;
+  } else {
+    const { book, chapter, verse, text } = state.votd;
+    inner = `
+      <div class="votd-welcome">Welcome back</div>
+      <div class="votd-label">Verse of the Day</div>
+      <p class="votd-text">&ldquo;${escapeHtml(text)}&rdquo;</p>
+      <p class="votd-ref">${escapeHtml(book)} ${chapter}:${verse}</p>
+      <div class="votd-actions">
+        <button class="votd-find-btn" data-votd-find>Find this verse</button>
+        <button class="votd-continue-btn" data-votd-close>Continue to Dashboard</button>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="votd-overlay">
+      <div class="votd-card">
+        <button class="votd-close" data-votd-close aria-label="Close">&times;</button>
+        ${inner}
+      </div>
+    </div>
+  `;
 }
 
 function renderHeader() {
@@ -832,6 +904,18 @@ function renderProgressTab() {
 // ---------- Event wiring ----------
 
 function attachHandlers() {
+  document.querySelectorAll("[data-votd-close]").forEach((btn) => {
+    btn.addEventListener("click", closeVerseOfDay);
+  });
+  const votdFindBtn = document.querySelector("[data-votd-find]");
+  if (votdFindBtn) votdFindBtn.addEventListener("click", goToVerseOfDay);
+  const votdOverlay = document.querySelector(".votd-overlay");
+  if (votdOverlay) {
+    votdOverlay.addEventListener("click", (e) => {
+      if (e.target === votdOverlay) closeVerseOfDay();
+    });
+  }
+
   document.querySelectorAll("[data-nav]").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.view = btn.dataset.nav;
@@ -1028,7 +1112,10 @@ function initDictionaryPopup() {
     selectionDebounce = setTimeout(handleVerseSelection, 300);
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") hideDictPopup();
+    if (e.key === "Escape") {
+      hideDictPopup();
+      if (state.showVerseOfDay) closeVerseOfDay();
+    }
   });
 }
 
@@ -1189,4 +1276,5 @@ function positionDictPopup(rect) {
   initDictionaryPopup();
   const last = Store.getLastPosition();
   loadChapter(last.book, last.chapter, last.translation || "web");
+  loadVerseOfDay();
 })();
