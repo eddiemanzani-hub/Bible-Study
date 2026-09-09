@@ -453,7 +453,7 @@ function renderQuizSection() {
   return `
     <section class="reflection">
       <h2>Chapter Quiz</h2>
-      <p class="hint">Fill in the blank from the text of ${escapeHtml(state.book)} ${state.chapter} to check you read closely.</p>
+      <p class="hint">Answer from the text of ${escapeHtml(state.book)} ${state.chapter} to check you read closely.</p>
       ${
         allAnswered
           ? `<div class="quiz-score-banner">

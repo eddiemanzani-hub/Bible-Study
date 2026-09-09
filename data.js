@@ -110,6 +110,7 @@ const QUIZ_STOPWORDS = new Set([
   "eighth","ninth","tenth","twelfth","great","greater","greatest","lesser",
   "least","more","most","much","many","little","less","good","bad","new","old",
   "man","men","day","days","son","sons","see","saw","seen","like","own",
+  "beginning","end","ends","midst","surface","kind","kinds","form","void",
 ]);
 
 // Fallback distractor words used when a chapter is too short to supply
@@ -152,6 +153,10 @@ const QUIZ_IMPORTANT_TERMS = [
   "flood", "rainbow", "dream", "vision", "throne", "scepter", "crown", "sword",
   "chariot", "chariots", "locust", "locusts", "drought", "queen", "king",
   "prince", "servant", "shepherd", "shepherds", "prayer", "worship", "holy",
+  "light", "darkness", "heaven", "heavens", "earth", "water", "waters",
+  "image", "likeness", "creature", "creatures", "beast", "beasts", "wind",
+  "cloud", "clouds", "fire", "sea", "seas", "land", "garden", "tree", "trees",
+  "fruit", "seed", "serpent", "soul", "breath", "generations", "nations",
 ];
 
 const HIGHLIGHT_COLORS = [
