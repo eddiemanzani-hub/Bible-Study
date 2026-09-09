@@ -34,6 +34,7 @@ const state = {
   narratorActive: false, // a chapter reading session is in progress (playing or paused)
   narratorPlaying: false, // actively speaking right now (vs. paused)
   narratorParagraphIndex: 0, // which paragraph of the current chapter is playing
+  narratorRate: parseFloat(localStorage.getItem("bsa:narratorRate")) || 1,
   progressCollapsed: localStorage.getItem("bsa:progressCollapsed") === "true",
   showSettings: false,
   readingFontSize: savedReadingSettings.fontSize || "md", // "sm" | "md" | "lg" | "xl"
@@ -548,7 +549,35 @@ function renderDashRingButton({ action, percent, centerText, colorClass, heading
 // ---------- Narrator (read-aloud via the browser's built-in text-to-speech) ----------
 
 const SPEECH_SUPPORTED = "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined";
+const NARRATOR_RATES = [0.75, 1, 1.25, 1.5];
 let narratorVoices = []; // [0] holds the single voice used for narration
+let narratorVerseOffsets = []; // [{ verse, start, end }] -- maps a boundary event's charIndex (into the joined paragraph text) back to a verse and local offset
+let narratorActiveWordEl = null; // the .narr-word span currently highlighted as "being read"
+
+function clearNarratorWordHighlight() {
+  if (narratorActiveWordEl) narratorActiveWordEl.classList.remove("narr-word-active");
+  narratorActiveWordEl = null;
+}
+
+// Web Speech fires a "word" boundary event (in browsers that support it) right
+// as each word starts being spoken, with charIndex into the utterance text --
+// used to highlight that word live in the reading paragraph.
+function handleNarratorBoundary(e) {
+  if (e.name && e.name !== "word") return;
+  const vo = narratorVerseOffsets.find((o) => e.charIndex >= o.start && e.charIndex < o.end);
+  if (!vo) return;
+  const localOffset = e.charIndex - vo.start;
+  const container = document.querySelector(`.verse-text[data-verse="${vo.verse}"]`);
+  if (!container) return;
+  const target = Array.from(container.querySelectorAll(".narr-word")).find(
+    (w) => localOffset >= Number(w.dataset.wordStart) && localOffset < Number(w.dataset.wordEnd)
+  );
+  if (narratorActiveWordEl && narratorActiveWordEl !== target) narratorActiveWordEl.classList.remove("narr-word-active");
+  if (target) {
+    target.classList.add("narr-word-active");
+    narratorActiveWordEl = target;
+  }
+}
 
 function loadNarratorVoices() {
   if (!SPEECH_SUPPORTED) return;
@@ -564,6 +593,8 @@ function stopNarrator() {
   state.narratorActive = false;
   state.narratorPlaying = false;
   state.narratorParagraphIndex = 0;
+  clearNarratorWordHighlight();
+  narratorVerseOffsets = [];
 }
 
 function speakParagraph(index) {
@@ -578,11 +609,21 @@ function speakParagraph(index) {
   state.narratorParagraphIndex = index;
   state.narratorActive = true;
   state.narratorPlaying = true;
+  clearNarratorWordHighlight();
 
   const text = paragraphs[index].map((v) => v.text).join(" ");
+  narratorVerseOffsets = [];
+  let cursor = 0;
+  paragraphs[index].forEach((v) => {
+    narratorVerseOffsets.push({ verse: v.verse, start: cursor, end: cursor + v.text.length });
+    cursor += v.text.length + 1; // +1 for the space chunkVersesIntoParagraphs' join(" ") inserts
+  });
+
   const utter = new SpeechSynthesisUtterance(text);
+  utter.rate = state.narratorRate;
   const voice = narratorVoices[0];
   if (voice) utter.voice = voice;
+  utter.onboundary = handleNarratorBoundary;
   utter.onend = () => {
     // Only auto-advance if this utterance wasn't cut off by cancel()/stop/skip.
     if (state.narratorActive && state.narratorPlaying && state.narratorParagraphIndex === index) {
@@ -627,11 +668,26 @@ function narratorNextParagraph() {
   speakParagraph(state.narratorParagraphIndex + 1);
 }
 
+function selectNarratorRate(rate) {
+  state.narratorRate = rate;
+  localStorage.setItem("bsa:narratorRate", String(rate));
+  if (state.narratorActive) {
+    speakParagraph(state.narratorParagraphIndex); // restart current paragraph at the new speed
+  } else {
+    render();
+  }
+}
+
 function renderNarratorBar() {
   if (!SPEECH_SUPPORTED) return "";
 
   const playPauseLabel = !state.narratorActive ? "Read Aloud" : state.narratorPlaying ? "Pause" : "Resume";
   const playPauseIcon = state.narratorActive && state.narratorPlaying ? "⏸" : "▶";
+
+  const rateButtons = NARRATOR_RATES.map(
+    (r) =>
+      `<button class="narrator-rate-btn ${state.narratorRate === r ? "active" : ""}" data-narrator-rate="${r}">${r}x</button>`
+  ).join("");
 
   return `
     <div class="narrator-bar">
@@ -648,6 +704,10 @@ function renderNarratorBar() {
                <button class="narrator-btn" data-narrator-action="stop" title="Stop">⏹</button>`
             : ""
         }
+      </div>
+      <div class="narrator-rates">
+        <span class="narrator-rates-label">Speed:</span>
+        ${rateButtons}
       </div>
     </div>
   `;
@@ -692,31 +752,52 @@ function chunkVersesIntoParagraphs(verses, size) {
 function renderParagraph(group, index) {
   const isNarrating = state.narratorActive && state.narratorParagraphIndex === index;
   return `<div class="chapter-paragraph${isNarrating ? " narrating" : ""}">${group
-    .map((v) => renderVerseBlock(v))
+    .map((v) => renderVerseBlock(v, isNarrating))
     .join(" ")}</div>`;
 }
 
 // A verse's inline text plus, when open, its note/explanation panel -- those
 // panels are block-level so they naturally break the paragraph flow right
 // after the verse they belong to, rather than living in a separate column.
-function renderVerseBlock(v) {
+function renderVerseBlock(v, isNarrating) {
   const data = Store.getVerseData(state.book, state.chapter, v.verse) || {};
   const noteOpen = state.openNoteVerse === v.verse;
   const explainOpen = state.openExplainVerse === v.verse;
 
-  return `${renderVerseInline(v, data)}${explainOpen ? renderExplainBox(v.verse) : ""}${
+  return `${renderVerseInline(v, data, isNarrating)}${explainOpen ? renderExplainBox(v.verse) : ""}${
     noteOpen ? renderNoteBox(v.verse, data) : ""
   }`;
 }
 
-function renderVerseInline(v, data) {
+function renderVerseInline(v, data, isNarrating) {
   const highlights = data.highlights || [];
   const hasNote = !!(data.note && data.note.trim());
   const noteIndicator = hasNote
     ? `<button class="note-indicator" data-note-toggle="${v.verse}" title="View note on verse ${v.verse}">📝</button>`
     : "";
+  // While this verse's paragraph is being read aloud, swap in per-word spans
+  // (instead of the highlight-color overlay) so the current word can be
+  // marked live from the narrator's speech-boundary events.
+  const textHtml = isNarrating ? renderNarratorWords(v.text) : renderHighlightedText(v.text, highlights);
 
-  return `<span class="verse-inline"><sup class="verse-num-inline">${v.verse}</sup><span class="verse-text" data-verse="${v.verse}">${renderHighlightedText(v.text, highlights)}</span>${noteIndicator}</span>`;
+  return `<span class="verse-inline"><sup class="verse-num-inline">${v.verse}</sup><span class="verse-text" data-verse="${v.verse}">${textHtml}</span>${noteIndicator}</span>`;
+}
+
+// Wraps each word of `text` in a span carrying its character offsets (within
+// this same string), so the narrator's onboundary handler can look up and
+// highlight the word currently being spoken.
+function renderNarratorWords(text) {
+  let html = "";
+  const re = /\S+|\s+/g;
+  let m;
+  while ((m = re.exec(text))) {
+    if (/\S/.test(m[0])) {
+      html += `<span class="narr-word" data-word-start="${m.index}" data-word-end="${m.index + m[0].length}">${escapeHtml(m[0])}</span>`;
+    } else {
+      html += m[0];
+    }
+  }
+  return html;
 }
 
 function renderNoteBox(verseNum, data) {
@@ -1146,6 +1227,10 @@ function attachHandlers() {
         render();
       }
     });
+  });
+
+  document.querySelectorAll("[data-narrator-rate]").forEach((btn) => {
+    btn.addEventListener("click", () => selectNarratorRate(Number(btn.dataset.narratorRate)));
   });
 
   const settingsOpenBtn = document.querySelector("[data-settings-open]");
