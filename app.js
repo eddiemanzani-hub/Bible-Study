@@ -1,3 +1,13 @@
+// Reading display preferences (font size / text color theme / spacing),
+// persisted as one small JSON blob.
+const savedReadingSettings = (function () {
+  try {
+    return JSON.parse(localStorage.getItem("bsa:readingSettings") || "{}");
+  } catch (e) {
+    return {};
+  }
+})();
+
 // App state
 const state = {
   view: "dashboard", // "dashboard" | "read" | "characters" | "notes"
@@ -26,6 +36,10 @@ const state = {
   narratorParagraphIndex: 0, // which paragraph of the current chapter is playing
   narratorVoiceIndex: Number(localStorage.getItem("bsa:narratorVoiceIndex")) || 0, // 0/1/2
   progressCollapsed: localStorage.getItem("bsa:progressCollapsed") === "true",
+  showSettings: false,
+  readingFontSize: savedReadingSettings.fontSize || "md", // "sm" | "md" | "lg" | "xl"
+  readingColorTheme: savedReadingSettings.colorTheme || "default", // "default" | "sepia" | "contrast" | "soft"
+  readingSpacing: savedReadingSettings.spacing || "normal", // "compact" | "normal" | "relaxed"
 };
 
 const debounceTimers = {};
@@ -194,6 +208,7 @@ function render() {
   const app = document.getElementById("app");
   app.innerHTML = `
     ${state.showVerseOfDay ? renderVerseOfDayOverlay() : ""}
+    ${state.showSettings ? renderSettingsOverlay() : ""}
     ${renderHeader()}
     <main>
       ${
@@ -251,6 +266,83 @@ function goToVerseOfDay() {
   });
 }
 
+// ---------- Reading settings (font size / text color / spacing) ----------
+
+const READING_FONT_SIZES = [
+  { id: "sm", label: "S" },
+  { id: "md", label: "M" },
+  { id: "lg", label: "L" },
+  { id: "xl", label: "XL" },
+];
+const READING_COLOR_THEMES = [
+  { id: "default", label: "Default" },
+  { id: "sepia", label: "Sepia" },
+  { id: "contrast", label: "High Contrast" },
+  { id: "soft", label: "Soft" },
+];
+const READING_SPACINGS = [
+  { id: "compact", label: "Compact" },
+  { id: "normal", label: "Normal" },
+  { id: "relaxed", label: "Relaxed" },
+];
+
+function openSettings() {
+  state.showSettings = true;
+  render();
+}
+
+function closeSettings() {
+  state.showSettings = false;
+  render();
+}
+
+function applyReadingSetting(key, value) {
+  state[key] = value;
+  localStorage.setItem(
+    "bsa:readingSettings",
+    JSON.stringify({
+      fontSize: state.readingFontSize,
+      colorTheme: state.readingColorTheme,
+      spacing: state.readingSpacing,
+    })
+  );
+  render();
+}
+
+function renderSettingsOptionRow(options, stateKey, activeValue) {
+  return options
+    .map(
+      (o) =>
+        `<button class="settings-opt-btn ${activeValue === o.id ? "active" : ""}" data-setting="${stateKey}" data-setting-value="${o.id}">${escapeHtml(o.label)}</button>`
+    )
+    .join("");
+}
+
+function renderSettingsOverlay() {
+  return `
+    <div class="settings-overlay">
+      <div class="settings-card">
+        <div class="settings-head">
+          <span class="settings-title">Reading Settings</span>
+          <button class="settings-close" data-settings-close aria-label="Close">&times;</button>
+        </div>
+        <div class="settings-group">
+          <div class="settings-label">Font size</div>
+          <div class="settings-opt-row">${renderSettingsOptionRow(READING_FONT_SIZES, "readingFontSize", state.readingFontSize)}</div>
+        </div>
+        <div class="settings-group">
+          <div class="settings-label">Text color</div>
+          <div class="settings-opt-row">${renderSettingsOptionRow(READING_COLOR_THEMES, "readingColorTheme", state.readingColorTheme)}</div>
+        </div>
+        <div class="settings-group">
+          <div class="settings-label">Spacing</div>
+          <div class="settings-opt-row">${renderSettingsOptionRow(READING_SPACINGS, "readingSpacing", state.readingSpacing)}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderVerseOfDayOverlay() {
   let inner;
   if (state.votdLoading) {
@@ -299,6 +391,7 @@ function renderHeader() {
     <header class="top-bar">
       <div class="top-row">
         <div class="brand">📖 Verse by Verse</div>
+        <button class="settings-btn" data-settings-open title="Reading settings" aria-label="Reading settings">⚙</button>
       </div>
       <div class="nav-links">
         <button data-nav="dashboard" class="${state.view === "dashboard" ? "active" : ""}">Dashboard</button>
@@ -598,7 +691,7 @@ function renderReadView() {
     ${renderNarratorBar()}
     <h1 class="chapter-title">${escapeHtml(state.book)} ${state.chapter}</h1>
     <p class="chapter-hint">Select any text to highlight it, look up a word, explain the verse, or add a note.</p>
-    <div id="verses" class="chapter-text">${paragraphsHtml}</div>
+    <div id="verses" class="chapter-text font-${state.readingFontSize} theme-${state.readingColorTheme} spacing-${state.readingSpacing}">${paragraphsHtml}</div>
     ${renderQuizSection()}
     <div class="bottom-nav">
       <button id="bottom-prev">&larr; Previous chapter</button>
@@ -1082,6 +1175,24 @@ function attachHandlers() {
     btn.addEventListener("click", () => selectNarratorVoice(Number(btn.dataset.narratorVoice)));
   });
 
+  const settingsOpenBtn = document.querySelector("[data-settings-open]");
+  if (settingsOpenBtn) settingsOpenBtn.addEventListener("click", openSettings);
+
+  document.querySelectorAll("[data-settings-close]").forEach((btn) => {
+    btn.addEventListener("click", closeSettings);
+  });
+
+  const settingsOverlay = document.querySelector(".settings-overlay");
+  if (settingsOverlay) {
+    settingsOverlay.addEventListener("click", (e) => {
+      if (e.target === settingsOverlay) closeSettings();
+    });
+  }
+
+  document.querySelectorAll("[data-setting]").forEach((btn) => {
+    btn.addEventListener("click", () => applyReadingSetting(btn.dataset.setting, btn.dataset.settingValue));
+  });
+
   document.querySelectorAll("[data-votd-close]").forEach((btn) => {
     btn.addEventListener("click", closeVerseOfDay);
   });
@@ -1293,6 +1404,7 @@ function initDictionaryPopup() {
     if (e.key === "Escape") {
       hideDictPopup();
       if (state.showVerseOfDay) closeVerseOfDay();
+      if (state.showSettings) closeSettings();
     }
   });
 }

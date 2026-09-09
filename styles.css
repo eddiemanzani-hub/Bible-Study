@@ -82,6 +82,21 @@ header.top-bar {
   white-space: nowrap;
 }
 
+.settings-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  width: 34px;
+  height: 34px;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.settings-btn:hover { border-color: var(--accent); color: var(--accent); }
+
 .nav-links {
   display: flex;
   justify-content: center;
@@ -427,6 +442,47 @@ h1.chapter-title {
   margin-left: -12px;
   margin-right: -12px;
 }
+
+/* Reading settings: font size */
+.chapter-text.font-sm { font-size: 0.92rem; }
+.chapter-text.font-md { font-size: 1.08rem; }
+.chapter-text.font-lg { font-size: 1.3rem; }
+.chapter-text.font-xl { font-size: 1.55rem; }
+
+/* Reading settings: spacing (line height + paragraph gap) */
+.chapter-text.spacing-compact { line-height: 1.35; }
+.chapter-text.spacing-compact .chapter-paragraph { margin-bottom: 10px; }
+.chapter-text.spacing-normal { line-height: 1.6; }
+.chapter-text.spacing-normal .chapter-paragraph { margin-bottom: 20px; }
+.chapter-text.spacing-relaxed { line-height: 2.1; }
+.chapter-text.spacing-relaxed .chapter-paragraph { margin-bottom: 34px; }
+
+/* Reading settings: text color themes -- fixed colors deliberately, so they
+   read consistently as an e-reader-style override regardless of system
+   light/dark mode. "Default" leaves the app's normal theme untouched. */
+.chapter-text.theme-sepia {
+  background: #f4ecd8;
+  color: #5b4636;
+  padding: 18px;
+  border-radius: 12px;
+}
+.chapter-text.theme-sepia .verse-num-inline { color: #8a6027; }
+
+.chapter-text.theme-contrast {
+  background: #000;
+  color: #fff;
+  padding: 18px;
+  border-radius: 12px;
+}
+.chapter-text.theme-contrast .verse-num-inline { color: #ffd166; }
+
+.chapter-text.theme-soft {
+  background: #eef1ea;
+  color: #4a4a42;
+  padding: 18px;
+  border-radius: 12px;
+}
+.chapter-text.theme-soft .verse-num-inline { color: #6b7a5e; }
 
 .verse-inline {
   cursor: default;
@@ -1303,4 +1359,92 @@ footer.app-footer {
   color: var(--text-muted);
   padding: 20px 0;
   margin: 0;
+}
+
+/* Reading settings overlay */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2100;
+  padding: 20px;
+}
+
+.settings-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  max-width: 360px;
+  width: 100%;
+  padding: 20px 22px 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-title {
+  font-family: Georgia, "Iowan Old Style", serif;
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+
+.settings-close {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+}
+
+.settings-close:hover { color: var(--text); }
+
+.settings-group {
+  margin-bottom: 18px;
+}
+
+.settings-group:last-child { margin-bottom: 0; }
+
+.settings-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.settings-opt-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-opt-btn {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.settings-opt-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.settings-opt-btn.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
 }
