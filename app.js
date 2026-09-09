@@ -213,6 +213,14 @@ function escapeHtml(str) {
 // tick -- see handleHeaderScroll below.
 let headerScrolled = false;
 
+// Keeps --header-h glued to the header's *actual* rendered height at all
+// times, including every intermediate frame of its collapse/expand
+// transition -- not just guessed at via a timeout -- so the sticky narrator
+// bar (top: var(--header-h), see styles.css) tracks it smoothly instead of
+// jumping once the animation happens to finish.
+const headerResizeObserver =
+  "ResizeObserver" in window ? new ResizeObserver(() => updateHeaderHeightVar()) : null;
+
 function render() {
   const app = document.getElementById("app");
   app.innerHTML = `
@@ -236,6 +244,11 @@ function render() {
   `;
   attachHandlers();
   updateHeaderHeightVar();
+  if (headerResizeObserver) {
+    headerResizeObserver.disconnect();
+    const header = document.querySelector("header.top-bar");
+    if (header) headerResizeObserver.observe(header);
+  }
 }
 
 // Keeps --header-h in sync with the sticky header's actual rendered height, so
@@ -248,19 +261,17 @@ function updateHeaderHeightVar() {
 
 // Collapses the header to a compact bar once the user scrolls a bit into the
 // chapter, freeing screen space for reading; expands again near the top.
-// Toggles the class directly (no render()) so scrolling stays smooth.
+// Toggles the class directly (no render()) so scrolling stays smooth. Uses
+// two different thresholds (rather than one) so small scroll fluctuations
+// right at the boundary -- momentum scrolling, mobile rubber-banding -- don't
+// make the header flicker collapsed/expanded/collapsed in a row.
 function handleHeaderScroll() {
-  const shouldCollapse = window.scrollY > 40;
+  const y = window.scrollY;
+  const shouldCollapse = headerScrolled ? y > 20 : y > 60;
   if (shouldCollapse !== headerScrolled) {
     headerScrolled = shouldCollapse;
     document.querySelector("header.top-bar")?.classList.toggle("scrolled", headerScrolled);
-    // The collapse/expand is animated (see .top-bar transitions in
-    // styles.css), so the header's offsetHeight right after the class flip
-    // is still mid-transition -- resync --header-h once it settles so the
-    // sticky narrator bar doesn't overlap the fully-expanded header.
-    setTimeout(updateHeaderHeightVar, 260);
   }
-  updateHeaderHeightVar();
 }
 
 // ---------- Verse of the Day (welcome overlay) ----------
@@ -1663,7 +1674,4 @@ function positionDictPopup(rect) {
   }
   window.addEventListener("scroll", handleHeaderScroll, { passive: true });
   window.addEventListener("resize", updateHeaderHeightVar);
-  document.addEventListener("transitionend", (e) => {
-    if (e.target.closest && e.target.closest("header.top-bar")) updateHeaderHeightVar();
-  });
 })();
