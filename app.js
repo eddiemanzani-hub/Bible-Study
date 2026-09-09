@@ -439,13 +439,29 @@ function renderDashRingButton({ action, percent, centerText, colorClass, heading
 const SPEECH_SUPPORTED = "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined";
 let narratorVoices = []; // up to 3 SpeechSynthesisVoice objects the user can pick between
 
+// Ranks a voice by how natural it's likely to sound, highest first. Classic
+// local OS voices (Windows SAPI "David"/"Mark"/"Zira", etc.) are the most
+// robotic-sounding option and are always available, so they're the fallback
+// rather than the default. Cloud/neural voices -- Edge's "Microsoft Aria/Guy/
+// Jenny Online (Natural)", Chrome's "Google US English", etc. -- sound far
+// more human and are preferred whenever the browser exposes them.
+function voiceQualityScore(voice) {
+  const n = voice.name.toLowerCase();
+  if (n.includes("natural") || n.includes("neural")) return 3;
+  if (n.includes("online")) return 2;
+  if (n.includes("google")) return 2;
+  if (voice.localService === false) return 1;
+  return 0;
+}
+
 function loadNarratorVoices() {
   if (!SPEECH_SUPPORTED) return;
   const all = window.speechSynthesis.getVoices();
   if (!all.length) return; // not ready yet; onvoiceschanged will retry
   const english = all.filter((v) => v.lang && v.lang.toLowerCase().startsWith("en"));
-  const pool = (english.length ? english : all).slice(0, 3);
-  narratorVoices = pool;
+  const pool = english.length ? english : all;
+  const ranked = pool.slice().sort((a, b) => voiceQualityScore(b) - voiceQualityScore(a));
+  narratorVoices = ranked.slice(0, 3);
   if (state.view === "read") render();
 }
 
@@ -473,6 +489,9 @@ function speakParagraph(index) {
   const utter = new SpeechSynthesisUtterance(text);
   const voice = narratorVoices[state.narratorVoiceIndex];
   if (voice) utter.voice = voice;
+  // A touch slower than full speed reads as calmer and less clipped/robotic,
+  // especially on older local voices -- neural voices barely need it.
+  utter.rate = voice && voiceQualityScore(voice) >= 2 ? 1 : 0.92;
   utter.onend = () => {
     // Only auto-advance if this utterance wasn't cut off by cancel()/stop/skip.
     if (state.narratorActive && state.narratorPlaying && state.narratorParagraphIndex === index) {
@@ -532,11 +551,15 @@ function renderNarratorBar() {
 
   const voiceButtons = [0, 1, 2]
     .map((i) => {
-      const has = !!narratorVoices[i];
+      const v = narratorVoices[i];
+      const has = !!v;
       const active = state.narratorVoiceIndex === i;
+      const isNatural = has && voiceQualityScore(v) >= 2;
       return `<button class="narrator-voice-btn ${active ? "active" : ""}" data-narrator-voice="${i}" ${
         has ? "" : "disabled"
-      } title="${has ? escapeHtml(narratorVoices[i].name) : "Not available on this device"}">Voice ${i + 1}</button>`;
+      } title="${has ? escapeHtml(v.name) : "Not available on this device"}">Voice ${i + 1}${
+        isNatural ? " ✨" : ""
+      }</button>`;
     })
     .join("");
 
