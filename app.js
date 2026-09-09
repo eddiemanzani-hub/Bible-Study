@@ -76,7 +76,8 @@ async function loadChapter(book, chapter, translation) {
   try {
     const verses = await BibleApi.fetchChapter(book, chapter, translation);
     state.verses = verses;
-    state.quiz = generateQuiz(translation, book, chapter, verses);
+    const quizAttempts = Store.getQuizState(translation, book, chapter).attempts;
+    state.quiz = generateQuiz(translation, book, chapter, verses, quizAttempts);
     // Reading progress is earned by completing the chapter's quiz (see
     // Store.setQuizAnswer), not just opening the page. The one exception is a
     // chapter too short to generate any quiz questions at all.
@@ -193,6 +194,8 @@ function answerQuiz(qIndex, optionIndex) {
 
 function clearQuiz() {
   Store.clearQuizState(state.translation, state.book, state.chapter);
+  const quizAttempts = Store.getQuizState(state.translation, state.book, state.chapter).attempts;
+  state.quiz = generateQuiz(state.translation, state.book, state.chapter, state.verses, quizAttempts);
   render();
 }
 

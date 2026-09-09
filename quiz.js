@@ -4,7 +4,10 @@
 // terms rather than arbitrary vocabulary (see categorizeWord below).
 // Generation is seeded (hash of translation+book+chapter+verse+word) so the
 // same chapter always produces the same questions, options in the same order,
-// letting a user's score stay meaningful across visits.
+// letting a user's score stay meaningful across visits. Passing a non-zero
+// `variant` (the chapter's completed-attempt count) reshuffles which words get
+// picked, so clicking "Retake quiz" after finishing a chapter surfaces a
+// different set of 5 questions instead of repeating the same ones.
 
 function hashStr(str) {
   let h = 2166136261;
@@ -126,17 +129,21 @@ function buildParagraphIndex(verses) {
 }
 
 // Picks up to `want` distinct-word entries, preferring the lowest-rank
-// (most important) category first, scanning each tier in verse order and
-// taking the first candidate from each not-yet-used paragraph -- so, within
-// the limits of what's available, no two questions come from the same
-// paragraph, and picks still end up spread across the chapter.
-function pickDistinctWordsByTier(entries, want, paragraphIndex) {
+// (most important) category first, scanning each tier and taking the first
+// candidate from each not-yet-used paragraph -- so, within the limits of
+// what's available, no two questions come from the same paragraph, and picks
+// still end up spread across the chapter. Tiers are ordered by verse number
+// when `seed` is 0 (the original, stable ordering); a non-zero seed shuffles
+// each tier instead, so a retake (seeded from the attempt count) can surface
+// a different set of words.
+function pickDistinctWordsByTier(entries, want, paragraphIndex, seed) {
   const maxRank = Math.max(...entries.map((e) => e.candidate.rank));
   const picked = [];
   const usedParagraphs = new Set();
 
   for (let tier = 1; tier <= maxRank && picked.length < want; tier++) {
-    const pool = entries.filter((e) => e.candidate.rank === tier).sort((a, b) => a.verse - b.verse);
+    const sorted = entries.filter((e) => e.candidate.rank === tier).sort((a, b) => a.verse - b.verse);
+    const pool = seed ? seededShuffle(sorted, seed + tier) : sorted;
     for (const entry of pool) {
       if (picked.length >= want) break;
       const p = paragraphIndex.get(entry.verse);
@@ -148,7 +155,7 @@ function pickDistinctWordsByTier(entries, want, paragraphIndex) {
   return picked;
 }
 
-function generateQuiz(translation, book, chapter, verses) {
+function generateQuiz(translation, book, chapter, verses, variant = 0) {
   const perVerse = verses
     .map((v) => ({
       verse: v.verse,
@@ -168,7 +175,8 @@ function generateQuiz(translation, book, chapter, verses) {
   // frequently repeated word like "God" doesn't become every question.
   const distinctWords = collectDistinctWords(perVerse);
   const paragraphIndex = buildParagraphIndex(verses);
-  const picks = pickDistinctWordsByTier(distinctWords, 5, paragraphIndex);
+  const pickSeed = variant ? hashStr(`${translation}:${book}:${chapter}:${variant}`) : 0;
+  const picks = pickDistinctWordsByTier(distinctWords, 5, paragraphIndex, pickSeed);
 
   return picks.map((pick, qIndex) => {
     const { verseEntry, candidate } = pick;
@@ -178,7 +186,7 @@ function generateQuiz(translation, book, chapter, verses) {
 
     // Prefer distractors from the same category, then widen the net.
     const kindOrder = [candidate.kind, "person", "place", "important", "proper", "other"];
-    const seedBase = `${translation}:${book}:${chapter}:${verseEntry.verse}:${correctWord.toLowerCase()}:${qIndex}`;
+    const seedBase = `${translation}:${book}:${chapter}:${verseEntry.verse}:${correctWord.toLowerCase()}:${qIndex}:${variant}`;
     let distractors = [];
     for (const kind of kindOrder) {
       if (distractors.length >= 3) break;
