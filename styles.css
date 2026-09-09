@@ -202,6 +202,80 @@ h1.chapter-title {
   margin: 0 0 18px;
 }
 
+.narrator-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.narrator-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.narrator-btn {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+.narrator-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.narrator-play-btn {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.narrator-voices {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.narrator-voices-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.narrator-voice-btn {
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  border-radius: 999px;
+  padding: 5px 11px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-family: inherit;
+}
+
+.narrator-voice-btn.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+
+.narrator-voice-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 /* Dashboard (landing page) */
 .dashboard-view {
   padding: 8px 0 40px;
@@ -319,6 +393,16 @@ h1.chapter-title {
 .chapter-paragraph {
   margin-bottom: 20px;
   text-indent: 1.4em;
+  border-radius: 8px;
+  transition: background 0.3s ease;
+}
+
+.chapter-paragraph.narrating {
+  background: var(--bg-elevated);
+  box-shadow: inset 3px 0 0 var(--accent);
+  padding: 10px 12px;
+  margin-left: -12px;
+  margin-right: -12px;
 }
 
 .verse-inline {

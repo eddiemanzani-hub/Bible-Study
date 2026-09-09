@@ -21,6 +21,10 @@ const state = {
   showVerseOfDay: true,
   votd: null, // { book, chapter, verse, text } once loaded
   votdLoading: true,
+  narratorActive: false, // a chapter reading session is in progress (playing or paused)
+  narratorPlaying: false, // actively speaking right now (vs. paused)
+  narratorParagraphIndex: 0, // which paragraph of the current chapter is playing
+  narratorVoiceIndex: Number(localStorage.getItem("bsa:narratorVoiceIndex")) || 0, // 0/1/2
 };
 
 const debounceTimers = {};
@@ -50,6 +54,7 @@ async function loadChapter(book, chapter, translation) {
   state.commentary = null;
   state.commentaryFor = null;
   state.commentaryError = null;
+  stopNarrator();
   hideDictPopup();
   Store.setLastPosition(book, chapter, translation);
   render();
@@ -429,6 +434,139 @@ function renderDashRingButton({ action, percent, centerText, colorClass, heading
   `;
 }
 
+// ---------- Narrator (read-aloud via the browser's built-in text-to-speech) ----------
+
+const SPEECH_SUPPORTED = "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined";
+let narratorVoices = []; // up to 3 SpeechSynthesisVoice objects the user can pick between
+
+function loadNarratorVoices() {
+  if (!SPEECH_SUPPORTED) return;
+  const all = window.speechSynthesis.getVoices();
+  if (!all.length) return; // not ready yet; onvoiceschanged will retry
+  const english = all.filter((v) => v.lang && v.lang.toLowerCase().startsWith("en"));
+  const pool = (english.length ? english : all).slice(0, 3);
+  narratorVoices = pool;
+  if (state.view === "read") render();
+}
+
+function stopNarrator() {
+  if (SPEECH_SUPPORTED) window.speechSynthesis.cancel();
+  state.narratorActive = false;
+  state.narratorPlaying = false;
+  state.narratorParagraphIndex = 0;
+}
+
+function speakParagraph(index) {
+  if (!SPEECH_SUPPORTED) return;
+  const paragraphs = chunkVersesIntoParagraphs(state.verses, 6);
+  if (index < 0 || index >= paragraphs.length || !paragraphs.length) {
+    stopNarrator();
+    render();
+    return;
+  }
+  window.speechSynthesis.cancel();
+  state.narratorParagraphIndex = index;
+  state.narratorActive = true;
+  state.narratorPlaying = true;
+
+  const text = paragraphs[index].map((v) => v.text).join(" ");
+  const utter = new SpeechSynthesisUtterance(text);
+  const voice = narratorVoices[state.narratorVoiceIndex];
+  if (voice) utter.voice = voice;
+  utter.onend = () => {
+    // Only auto-advance if this utterance wasn't cut off by cancel()/stop/skip.
+    if (state.narratorActive && state.narratorPlaying && state.narratorParagraphIndex === index) {
+      speakParagraph(index + 1);
+    }
+  };
+  utter.onerror = () => {
+    // Skipping/rewinding/stopping calls speechSynthesis.cancel() on this very
+    // utterance, which fires "error" (not just "end") -- ignore that stale
+    // event so it doesn't clobber the state a newer speakParagraph() call
+    // already set.
+    if (state.narratorParagraphIndex !== index) return;
+    state.narratorPlaying = false;
+    render();
+  };
+  window.speechSynthesis.speak(utter);
+  render();
+}
+
+function toggleNarratorPlayPause() {
+  if (!SPEECH_SUPPORTED || !state.verses.length) return;
+  if (!state.narratorActive) {
+    speakParagraph(0);
+  } else if (state.narratorPlaying) {
+    window.speechSynthesis.pause();
+    state.narratorPlaying = false;
+    render();
+  } else {
+    window.speechSynthesis.resume();
+    state.narratorPlaying = true;
+    render();
+  }
+}
+
+function narratorPrevParagraph() {
+  if (!state.narratorActive) return;
+  speakParagraph(Math.max(0, state.narratorParagraphIndex - 1));
+}
+
+function narratorNextParagraph() {
+  if (!state.narratorActive) return;
+  speakParagraph(state.narratorParagraphIndex + 1);
+}
+
+function selectNarratorVoice(index) {
+  state.narratorVoiceIndex = index;
+  localStorage.setItem("bsa:narratorVoiceIndex", String(index));
+  if (state.narratorActive) {
+    speakParagraph(state.narratorParagraphIndex); // restart current paragraph in the new voice
+  } else {
+    render();
+  }
+}
+
+function renderNarratorBar() {
+  if (!SPEECH_SUPPORTED) return "";
+
+  const voiceButtons = [0, 1, 2]
+    .map((i) => {
+      const has = !!narratorVoices[i];
+      const active = state.narratorVoiceIndex === i;
+      return `<button class="narrator-voice-btn ${active ? "active" : ""}" data-narrator-voice="${i}" ${
+        has ? "" : "disabled"
+      } title="${has ? escapeHtml(narratorVoices[i].name) : "Not available on this device"}">Voice ${i + 1}</button>`;
+    })
+    .join("");
+
+  const playPauseLabel = !state.narratorActive ? "Read Aloud" : state.narratorPlaying ? "Pause" : "Resume";
+  const playPauseIcon = state.narratorActive && state.narratorPlaying ? "⏸" : "▶";
+
+  return `
+    <div class="narrator-bar">
+      <div class="narrator-controls">
+        ${
+          state.narratorActive
+            ? `<button class="narrator-btn" data-narrator-action="prev" title="Previous paragraph">⏮</button>`
+            : ""
+        }
+        <button class="narrator-btn narrator-play-btn" data-narrator-action="playpause">${playPauseIcon} ${playPauseLabel}</button>
+        ${
+          state.narratorActive
+            ? `<button class="narrator-btn" data-narrator-action="next" title="Next paragraph">⏭</button>
+               <button class="narrator-btn" data-narrator-action="stop" title="Stop">⏹</button>`
+            : ""
+        }
+      </div>
+      <div class="narrator-voices">
+        <span class="narrator-voices-label">Voice:</span>
+        ${voiceButtons}
+      </div>
+    </div>
+  `;
+}
+
 function renderReadView() {
   if (state.loading) {
     return `<p class="status-msg">Loading ${escapeHtml(state.book)} ${state.chapter}…</p>`;
@@ -438,9 +576,10 @@ function renderReadView() {
   }
 
   const paragraphs = chunkVersesIntoParagraphs(state.verses, 6);
-  const paragraphsHtml = paragraphs.map((group) => renderParagraph(group)).join("");
+  const paragraphsHtml = paragraphs.map((group, i) => renderParagraph(group, i)).join("");
 
   return `
+    ${renderNarratorBar()}
     <h1 class="chapter-title">${escapeHtml(state.book)} ${state.chapter}</h1>
     <p class="chapter-hint">Select any text to highlight it, look up a word, explain the verse, or add a note.</p>
     <div id="verses" class="chapter-text">${paragraphsHtml}</div>
@@ -464,8 +603,11 @@ function chunkVersesIntoParagraphs(verses, size) {
   return groups;
 }
 
-function renderParagraph(group) {
-  return `<div class="chapter-paragraph">${group.map((v) => renderVerseBlock(v)).join(" ")}</div>`;
+function renderParagraph(group, index) {
+  const isNarrating = state.narratorActive && state.narratorParagraphIndex === index;
+  return `<div class="chapter-paragraph${isNarrating ? " narrating" : ""}">${group
+    .map((v) => renderVerseBlock(v))
+    .join(" ")}</div>`;
 }
 
 // A verse's inline text plus, when open, its note/explanation panel -- those
@@ -904,6 +1046,23 @@ function renderProgressTab() {
 // ---------- Event wiring ----------
 
 function attachHandlers() {
+  document.querySelectorAll("[data-narrator-action]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.narratorAction;
+      if (action === "playpause") toggleNarratorPlayPause();
+      else if (action === "prev") narratorPrevParagraph();
+      else if (action === "next") narratorNextParagraph();
+      else if (action === "stop") {
+        stopNarrator();
+        render();
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-narrator-voice]").forEach((btn) => {
+    btn.addEventListener("click", () => selectNarratorVoice(Number(btn.dataset.narratorVoice)));
+  });
+
   document.querySelectorAll("[data-votd-close]").forEach((btn) => {
     btn.addEventListener("click", closeVerseOfDay);
   });
@@ -1277,4 +1436,8 @@ function positionDictPopup(rect) {
   const last = Store.getLastPosition();
   loadChapter(last.book, last.chapter, last.translation || "web");
   loadVerseOfDay();
+  if (SPEECH_SUPPORTED) {
+    loadNarratorVoices();
+    window.speechSynthesis.onvoiceschanged = loadNarratorVoices;
+  }
 })();
