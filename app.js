@@ -221,14 +221,14 @@ function renderHeader() {
     <header class="top-bar">
       <div class="top-row">
         <div class="brand">📖 Verse by Verse</div>
-        <div class="nav-links">
-          <button data-nav="dashboard" class="${state.view === "dashboard" ? "active" : ""}">Dashboard</button>
-          <button data-nav="read" class="${state.view === "read" ? "active" : ""}">Read</button>
-          <button data-nav="characters" class="${state.view === "characters" ? "active" : ""}">Characters</button>
-          <button data-nav="notes" class="${state.view === "notes" ? "active" : ""}">My Notes</button>
-        </div>
       </div>
-      ${renderHeaderProgress()}
+      <div class="nav-links">
+        <button data-nav="dashboard" class="${state.view === "dashboard" ? "active" : ""}">Dashboard</button>
+        <button data-nav="read" class="${state.view === "read" ? "active" : ""}">Read</button>
+        <button data-nav="characters" class="${state.view === "characters" ? "active" : ""}">Characters</button>
+        <button data-nav="notes" class="${state.view === "notes" ? "active" : ""}">My Notes</button>
+      </div>
+      ${state.view === "read" ? renderHeaderProgress() : ""}
       ${
         state.view === "read"
           ? `
