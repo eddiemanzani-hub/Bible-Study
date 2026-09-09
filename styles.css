@@ -538,11 +538,15 @@ h1.chapter-title {
   color: var(--accent);
   font-size: 0.75em;
   margin-right: 2px;
-  user-select: none;
+  /* Deliberately selectable (not user-select: none): on touch, a long-press
+     landing precisely on this small superscript used to refuse to start a
+     selection at all. handleVerseSelection() in app.js clamps a selection
+     that starts here back to the start of the verse's own text. */
 }
 
 .verse-text {
   user-select: text;
+  -webkit-touch-callout: none;
 }
 
 .hl-span.hl-yellow { background: var(--hl-yellow); }

@@ -1508,11 +1508,23 @@ function initDictionaryPopup() {
       if (state.showSettings) closeSettings();
     }
   });
+
+  // Long-pressing verse text on mobile can trigger the browser/OS's own
+  // native selection menu (copy/share/etc.), which pops up over our custom
+  // popup and steals the next tap -- suppress it there so our popup (from
+  // handleVerseSelection above) is the only UI offered on a selection.
+  document.addEventListener("contextmenu", (e) => {
+    if (e.target.closest && e.target.closest(".verse-text")) e.preventDefault();
+  });
 }
 
 function hideDictPopup() {
   if (dictPopupEl) dictPopupEl.hidden = true;
   currentSelection = null;
+}
+
+function elementOf(node) {
+  return node && (node.nodeType === 3 ? node.parentElement : node);
 }
 
 function handleVerseSelection() {
@@ -1523,16 +1535,31 @@ function handleVerseSelection() {
     return;
   }
   const range = sel.getRangeAt(0);
-  const anchorNode = range.startContainer;
-  const container = anchorNode && (anchorNode.nodeType === 3 ? anchorNode.parentElement : anchorNode);
-  const verseTextEl = container && container.closest(".verse-text");
+
+  // A touch drag easily starts or ends a hair outside the verse's own text
+  // node -- e.g. right on the small superscript verse number just before it,
+  // or the note icon just after it -- which used to make the whole selection
+  // silently not count as highlightable. Fall back through the start
+  // container, end container, and finally the range's common ancestor to
+  // find which verse this selection belongs to.
+  const verseTextEl =
+    elementOf(range.startContainer)?.closest(".verse-text") ||
+    elementOf(range.endContainer)?.closest(".verse-text") ||
+    elementOf(range.commonAncestorContainer)?.closest(".verse-text") ||
+    elementOf(range.commonAncestorContainer)?.querySelector(".verse-text");
   if (!verseTextEl) {
     hideDictPopup();
     return;
   }
 
-  const start = textOffsetWithin(verseTextEl, range.startContainer, range.startOffset);
-  const end = textOffsetWithin(verseTextEl, range.endContainer, range.endOffset);
+  // Clamp each endpoint into verseTextEl's own text when it actually landed
+  // outside it (e.g. on the verse-number label or the note icon button).
+  const start = verseTextEl.contains(range.startContainer)
+    ? textOffsetWithin(verseTextEl, range.startContainer, range.startOffset)
+    : 0;
+  const end = verseTextEl.contains(range.endContainer)
+    ? textOffsetWithin(verseTextEl, range.endContainer, range.endOffset)
+    : verseTextEl.textContent.length;
   currentSelection = {
     book: state.book,
     chapter: state.chapter,
