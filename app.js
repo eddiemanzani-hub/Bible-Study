@@ -901,12 +901,23 @@ function initDictionaryPopup() {
   dictPopupEl.id = "dict-popup";
   dictPopupEl.hidden = true;
   document.body.appendChild(dictPopupEl);
-  // Keep the browser selection alive while interacting with the popup's buttons.
+  // Keep the browser selection visible while interacting with the popup's
+  // buttons on desktop. (Not done for touch: calling preventDefault() on
+  // touchstart suppresses the browser's synthesized click event entirely on
+  // some mobile browsers, so buttons would silently stop responding to taps.
+  // It's unnecessary anyway -- our handlers use the `currentSelection` object
+  // captured at selection-time, not a live re-read of window.getSelection().)
   dictPopupEl.addEventListener("mousedown", (e) => e.preventDefault());
 
-  document.addEventListener("mouseup", () => {
-    // Deferred so the browser has finished updating the selection (matters for double-click).
-    setTimeout(handleVerseSelection, 0);
+  // `selectionchange` fires for every input method (mouse drag, double-click,
+  // keyboard, and -- unlike "mouseup" -- touch: mobile selects text via a
+  // long-press-and-drag gesture that never fires a mouseup at all. Debounced
+  // so we react once the selection has settled rather than on every tick of
+  // a drag or of the mobile selection handles being adjusted.
+  let selectionDebounce = null;
+  document.addEventListener("selectionchange", () => {
+    clearTimeout(selectionDebounce);
+    selectionDebounce = setTimeout(handleVerseSelection, 300);
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") hideDictPopup();
