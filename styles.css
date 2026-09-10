@@ -401,7 +401,36 @@ h1.chapter-title {
 .dashboard-sub {
   font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--text-muted);
-  margin: 0 0 32px;
+  margin: 0 0 20px;
+}
+
+.streak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: var(--gold-soft);
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  padding: 7px 14px;
+  margin-bottom: 24px;
+}
+
+.streak-flame { font-size: 1rem; }
+
+.streak-hint {
+  font-weight: 500;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.streak-badge-empty {
+  background: none;
+  border-style: dashed;
+  color: var(--text-muted);
 }
 
 .dash-ring-row {
@@ -521,6 +550,103 @@ h1.chapter-title {
   background: var(--accent);
   color: var(--accent-contrast);
   border-radius: 3px;
+}
+
+/* Memorize (verse-matching game) */
+.memorize-view { padding: 8px 0 40px; }
+
+.memorize-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.memorize-mode-btn, .memorize-new-round-btn {
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.memorize-mode-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.memorize-new-round-btn:hover, .memorize-mode-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.memorize-progress, .memorize-complete {
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.memorize-complete {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.memorize-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 560px) {
+  .memorize-grid { grid-template-columns: 1fr; }
+}
+
+.memorize-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.memorize-card {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, opacity 0.2s ease;
+}
+
+.memorize-card:hover { border-color: var(--accent); }
+
+.memorize-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.memorize-card.matched {
+  border-color: #4a8f45;
+  background: var(--gold-soft);
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.75;
+}
+
+.memorize-card.wrong {
+  border-color: #b1495e;
+  background: #b1495e22;
 }
 
 /* Reading settings: font size */

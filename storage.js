@@ -7,7 +7,14 @@ const STORAGE_KEYS = {
   cache: "bsa:chapterCache",        // { "translation:Book:Ch": { verses:[...], fetchedAt } }
   commentaryCache: "bsa:commentaryCache", // { "Book:Ch": { introduction, blocks:[...], fetchedAt } }
   dictionaryCache: "bsa:dictionaryCache", // { "word": { entries:[...], fetchedAt } }
+  streak: "bsa:streak",              // { lastActiveDate: "YYYY-MM-DD", currentStreak, longestStreak }
 };
+
+// Local (not UTC) calendar-day string, so a streak's "day" lines up with the
+// user's own midnight rather than shifting for people west of UTC.
+function localDateStr(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 
 function readJSON(key, fallback) {
   try {
@@ -122,12 +129,43 @@ const Store = {
     return !!all[this.readKey(book, chapter)];
   },
   markChapterRead(book, chapter) {
+    this.recordActivityToday();
     const all = this.getReadChapters();
     const key = this.readKey(book, chapter);
     if (!all[key]) {
       all[key] = Date.now();
       writeJSON(STORAGE_KEYS.readChapters, all);
     }
+  },
+
+  // ---- Reading streak: consecutive calendar days with a completed quiz ----
+
+  // Called every time a chapter's quiz is completed (from markChapterRead
+  // above), whether that chapter is new or a retake -- either way, the user
+  // showed up and studied today.
+  recordActivityToday() {
+    const data = readJSON(STORAGE_KEYS.streak, { lastActiveDate: null, currentStreak: 0, longestStreak: 0 });
+    const todayStr = localDateStr(new Date());
+    if (data.lastActiveDate === todayStr) return; // already recorded today
+    const yesterdayStr = localDateStr(new Date(Date.now() - 86400000));
+    data.currentStreak = data.lastActiveDate === yesterdayStr ? data.currentStreak + 1 : 1;
+    data.longestStreak = Math.max(data.longestStreak || 0, data.currentStreak);
+    data.lastActiveDate = todayStr;
+    writeJSON(STORAGE_KEYS.streak, data);
+  },
+  // The streak only counts as "current" if the last active day was today or
+  // yesterday -- otherwise it's lapsed, even though the stored number is left
+  // alone until the next completed quiz overwrites it.
+  getStreak() {
+    const data = readJSON(STORAGE_KEYS.streak, { lastActiveDate: null, currentStreak: 0, longestStreak: 0 });
+    const todayStr = localDateStr(new Date());
+    const yesterdayStr = localDateStr(new Date(Date.now() - 86400000));
+    const isCurrent = data.lastActiveDate === todayStr || data.lastActiveDate === yesterdayStr;
+    return {
+      currentStreak: isCurrent ? data.currentStreak || 0 : 0,
+      longestStreak: data.longestStreak || 0,
+      activeToday: data.lastActiveDate === todayStr,
+    };
   },
   getReadCount() {
     return Object.keys(this.getReadChapters()).length;

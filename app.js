@@ -10,7 +10,7 @@ const savedReadingSettings = (function () {
 
 // App state
 const state = {
-  view: "dashboard", // "dashboard" | "read" | "characters" | "notes"
+  view: "dashboard", // "dashboard" | "read" | "characters" | "notes" | "memorize"
   book: "Genesis",
   chapter: 1,
   translation: "web",
@@ -41,6 +41,17 @@ const state = {
   readingColorTheme: savedReadingSettings.colorTheme || "default", // "default" | "sepia" | "contrast" | "soft"
   readingSpacing: savedReadingSettings.spacing || "normal", // "compact" | "normal" | "relaxed"
   appTheme: localStorage.getItem("bsa:appTheme") || null, // "light" | "dark" | null (null = follow system)
+
+  // ---- Memorize (verse-matching game) ----
+  memorizeMode: "reference", // "reference" | "speaker"
+  memorizeRound: [], // [{ id, book, chapter, verse, label, text }]
+  memorizeLeftOrder: [], // ids, in the order verse cards are displayed
+  memorizeRightOrder: [], // ids, in the order label cards are displayed
+  memorizeMatchedIds: [],
+  memorizeSelectedLeftId: null,
+  memorizeSelectedRightId: null,
+  memorizeWrongFlash: null, // { leftId, rightId } briefly, while a wrong guess flashes red
+  memorizeLoading: false,
 };
 
 // Applied immediately (before the first render, and before <body> even
@@ -241,6 +252,8 @@ function render() {
           ? renderReadView()
           : state.view === "characters"
           ? renderCharactersView()
+          : state.view === "memorize"
+          ? renderMemorizeView()
           : renderNotesView()
       }
     </main>
@@ -467,6 +480,7 @@ function renderHeader() {
         <button data-nav="read" class="${state.view === "read" ? "active" : ""}">Read</button>
         <button data-nav="characters" class="${state.view === "characters" ? "active" : ""}">Characters</button>
         <button data-nav="notes" class="${state.view === "notes" ? "active" : ""}">My Notes</button>
+        <button data-nav="memorize" class="${state.view === "memorize" ? "active" : ""}">Memorize</button>
       </div>
       ${state.view === "read" ? renderHeaderProgress() : ""}
       ${
@@ -577,10 +591,20 @@ function renderDashboardView() {
     caption: `${annotatedChapters} chapter${annotatedChapters === 1 ? "" : "s"} annotated`,
   });
 
+  const streak = Store.getStreak();
+  const streakBadge =
+    streak.currentStreak > 0
+      ? `<div class="streak-badge" title="Longest streak: ${streak.longestStreak} day${streak.longestStreak === 1 ? "" : "s"}">
+           <span class="streak-flame">🔥</span> ${streak.currentStreak}-day streak
+           ${!streak.activeToday ? `<span class="streak-hint">— finish a quiz today to keep it going</span>` : ""}
+         </div>`
+      : `<div class="streak-badge streak-badge-empty">Finish a chapter quiz today to start a streak</div>`;
+
   return `
     <div class="dashboard-view">
       <h1 class="dashboard-title">Welcome back</h1>
       <p class="dashboard-sub">Here's your progress at a glance.</p>
+      ${streakBadge}
       <div class="dash-ring-row">
         ${continueRing}
         ${quizRing}
@@ -1039,6 +1063,174 @@ function bookOrderIndex(bookName) {
   return BIBLE_BOOKS.findIndex((b) => b.name === bookName);
 }
 
+// ---------- Memorize (verse-matching game) ----------
+// A tap-to-match game: pick a verse card on the left, then the target on the
+// right you think it belongs to. Two modes share the same mechanics but pull
+// from different pools/labels -- "reference" (VERSE_OF_DAY_REFS, labeled by
+// book+chapter) and "speaker" (VERSE_SPEAKERS, labeled by who said it).
+
+const MEMORIZE_ROUND_SIZE = 5;
+
+function memorizeLabelOf(mode, entry) {
+  return mode === "speaker" ? entry.speaker : `${entry.book} ${entry.chapter}`;
+}
+
+// Picks ROUND_SIZE entries with distinct labels -- necessary for "speaker"
+// mode, where several verses can share the same speaker (e.g. several Jesus
+// quotes), which would otherwise make two left cards legitimately match the
+// same right card.
+function pickMemorizeRound(mode) {
+  const pool = mode === "speaker" ? VERSE_SPEAKERS : VERSE_OF_DAY_REFS;
+  const shuffled = pool.slice().sort(() => Math.random() - 0.5);
+  const picked = [];
+  const usedLabels = new Set();
+  for (const entry of shuffled) {
+    if (picked.length >= MEMORIZE_ROUND_SIZE) break;
+    const label = memorizeLabelOf(mode, entry);
+    if (usedLabels.has(label)) continue;
+    usedLabels.add(label);
+    picked.push({ ...entry, label });
+  }
+  return picked;
+}
+
+function shuffledIds(n) {
+  const ids = Array.from({ length: n }, (_, i) => i);
+  for (let i = ids.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+  }
+  return ids;
+}
+
+function setMemorizeMode(mode) {
+  if (state.memorizeMode === mode) return;
+  state.memorizeMode = mode;
+  startMemorizeRound();
+}
+
+async function startMemorizeRound() {
+  const picked = pickMemorizeRound(state.memorizeMode);
+  state.memorizeRound = picked.map((p, id) => ({ id, ...p, text: null }));
+  state.memorizeLeftOrder = shuffledIds(picked.length);
+  state.memorizeRightOrder = shuffledIds(picked.length);
+  state.memorizeMatchedIds = [];
+  state.memorizeSelectedLeftId = null;
+  state.memorizeSelectedRightId = null;
+  state.memorizeWrongFlash = null;
+  state.memorizeLoading = true;
+  render();
+
+  await Promise.all(
+    state.memorizeRound.map(async (entry) => {
+      try {
+        const verses = await BibleApi.fetchChapter(entry.book, entry.chapter, state.translation || "web");
+        const v = verses.find((x) => x.verse === entry.verse);
+        entry.text = v ? v.text : "(couldn't load this verse)";
+      } catch (err) {
+        entry.text = "(couldn't load this verse)";
+      }
+    })
+  );
+  state.memorizeLoading = false;
+  render();
+}
+
+function selectMemorizeCard(side, id) {
+  if (state.memorizeMatchedIds.includes(id) || state.memorizeWrongFlash) return;
+  if (side === "left") {
+    state.memorizeSelectedLeftId = state.memorizeSelectedLeftId === id ? null : id;
+  } else {
+    state.memorizeSelectedRightId = state.memorizeSelectedRightId === id ? null : id;
+  }
+  render();
+
+  const { memorizeSelectedLeftId: leftId, memorizeSelectedRightId: rightId } = state;
+  if (leftId == null || rightId == null) return;
+
+  if (leftId === rightId) {
+    state.memorizeMatchedIds.push(leftId);
+    state.memorizeSelectedLeftId = null;
+    state.memorizeSelectedRightId = null;
+    render();
+  } else {
+    state.memorizeWrongFlash = { leftId, rightId };
+    render();
+    setTimeout(() => {
+      state.memorizeWrongFlash = null;
+      state.memorizeSelectedLeftId = null;
+      state.memorizeSelectedRightId = null;
+      render();
+    }, 700);
+  }
+}
+
+function memorizeCardClass(side, id) {
+  const classes = ["memorize-card"];
+  const selectedId = side === "left" ? state.memorizeSelectedLeftId : state.memorizeSelectedRightId;
+  if (state.memorizeMatchedIds.includes(id)) classes.push("matched");
+  else if (state.memorizeWrongFlash && state.memorizeWrongFlash[side + "Id"] === id) classes.push("wrong");
+  else if (selectedId === id) classes.push("selected");
+  return classes.join(" ");
+}
+
+function renderMemorizeView() {
+  const allMatched = state.memorizeRound.length > 0 && state.memorizeMatchedIds.length === state.memorizeRound.length;
+
+  const modeRow = `
+    <div class="memorize-mode-row">
+      <button class="memorize-mode-btn ${state.memorizeMode === "reference" ? "active" : ""}" data-memorize-mode="reference">Match the Reference</button>
+      <button class="memorize-mode-btn ${state.memorizeMode === "speaker" ? "active" : ""}" data-memorize-mode="speaker">Match the Speaker</button>
+      <button class="memorize-new-round-btn" data-memorize-new-round>↻ New Round</button>
+    </div>
+  `;
+
+  if (state.memorizeLoading) {
+    return `
+      <div class="memorize-view">
+        <h1 class="dashboard-title">Memorize</h1>
+        <p class="dashboard-sub">${state.memorizeMode === "speaker" ? "Match each verse to who said it." : "Match each verse to where it's from."}</p>
+        ${modeRow}
+        <p class="status-msg">Loading verses…</p>
+      </div>
+    `;
+  }
+
+  const byId = {};
+  state.memorizeRound.forEach((e) => (byId[e.id] = e));
+
+  const leftCards = state.memorizeLeftOrder
+    .map((id) => {
+      const e = byId[id];
+      return `<button class="${memorizeCardClass("left", id)}" data-memorize-side="left" data-memorize-id="${id}">&ldquo;${escapeHtml(e.text)}&rdquo;</button>`;
+    })
+    .join("");
+
+  const rightCards = state.memorizeRightOrder
+    .map((id) => {
+      const e = byId[id];
+      return `<button class="${memorizeCardClass("right", id)}" data-memorize-side="right" data-memorize-id="${id}">${escapeHtml(e.label)}</button>`;
+    })
+    .join("");
+
+  return `
+    <div class="memorize-view">
+      <h1 class="dashboard-title">Memorize</h1>
+      <p class="dashboard-sub">${state.memorizeMode === "speaker" ? "Match each verse to who said it." : "Match each verse to where it's from."}</p>
+      ${modeRow}
+      ${
+        allMatched
+          ? `<div class="memorize-complete">🎉 All ${state.memorizeRound.length} matched! <button class="memorize-new-round-btn" data-memorize-new-round>Play another round</button></div>`
+          : `<div class="memorize-progress">${state.memorizeMatchedIds.length} / ${state.memorizeRound.length} matched</div>`
+      }
+      <div class="memorize-grid">
+        <div class="memorize-col">${leftCards}</div>
+        <div class="memorize-col">${rightCards}</div>
+      </div>
+    </div>
+  `;
+}
+
 function renderCharactersView() {
   const tabs = `
     <div class="notes-tabs">
@@ -1332,8 +1524,22 @@ function attachHandlers() {
   document.querySelectorAll("[data-nav]").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.view = btn.dataset.nav;
-      render();
+      if (state.view === "memorize" && state.memorizeRound.length === 0) {
+        startMemorizeRound();
+      } else {
+        render();
+      }
     });
+  });
+
+  document.querySelectorAll("[data-memorize-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => setMemorizeMode(btn.dataset.memorizeMode));
+  });
+  document.querySelectorAll("[data-memorize-new-round]").forEach((btn) => {
+    btn.addEventListener("click", () => startMemorizeRound());
+  });
+  document.querySelectorAll("[data-memorize-side]").forEach((btn) => {
+    btn.addEventListener("click", () => selectMemorizeCard(btn.dataset.memorizeSide, Number(btn.dataset.memorizeId)));
   });
 
   document.querySelectorAll("[data-dash-action]").forEach((btn) => {

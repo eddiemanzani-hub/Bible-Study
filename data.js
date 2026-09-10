@@ -289,3 +289,30 @@ const VERSE_OF_DAY_REFS = [
   { book: "Revelation", chapter: 21, verse: 4 },
   { book: "Revelation", chapter: 22, verse: 13 },
 ];
+
+// Well-known verses paired with who is explicitly speaking in that passage --
+// used by the "Match the Speaker" mode in the Memorize view. Kept deliberately
+// short and conservative: every entry is a case where the text itself names
+// or clearly identifies the speaker, not a debatable attribution.
+const VERSE_SPEAKERS = [
+  { book: "Genesis", chapter: 1, verse: 3, speaker: "God" },
+  { book: "Exodus", chapter: 3, verse: 14, speaker: "God" },
+  { book: "Joshua", chapter: 1, verse: 9, speaker: "God" },
+  { book: "Psalms", chapter: 46, verse: 10, speaker: "God" },
+  { book: "Jeremiah", chapter: 29, verse: 11, speaker: "God" },
+  { book: "Psalms", chapter: 23, verse: 1, speaker: "David" },
+  { book: "Luke", chapter: 1, verse: 28, speaker: "The angel Gabriel" },
+  { book: "Luke", chapter: 1, verse: 38, speaker: "Mary" },
+  { book: "Matthew", chapter: 5, verse: 3, speaker: "Jesus" },
+  { book: "Matthew", chapter: 6, verse: 9, speaker: "Jesus" },
+  { book: "Matthew", chapter: 22, verse: 37, speaker: "Jesus" },
+  { book: "Matthew", chapter: 28, verse: 19, speaker: "Jesus" },
+  { book: "John", chapter: 3, verse: 16, speaker: "Jesus" },
+  { book: "John", chapter: 11, verse: 25, speaker: "Jesus" },
+  { book: "John", chapter: 14, verse: 6, speaker: "Jesus" },
+  { book: "Acts", chapter: 1, verse: 8, speaker: "Jesus" },
+  { book: "Romans", chapter: 8, verse: 28, speaker: "Paul" },
+  { book: "Romans", chapter: 3, verse: 23, speaker: "Paul" },
+  { book: "1 Corinthians", chapter: 13, verse: 4, speaker: "Paul" },
+  { book: "Philippians", chapter: 4, verse: 13, speaker: "Paul" },
+];
