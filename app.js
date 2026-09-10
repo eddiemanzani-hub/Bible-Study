@@ -45,12 +45,10 @@ const state = {
   // ---- Memorize (verse-matching game) ----
   memorizeMode: "reference", // "reference" | "speaker"
   memorizeRound: [], // [{ id, book, chapter, verse, label, text }]
-  memorizeLeftOrder: [], // ids, in the order verse cards are displayed
-  memorizeRightOrder: [], // ids, in the order label cards are displayed
-  memorizeMatchedIds: [],
-  memorizeSelectedLeftId: null,
-  memorizeSelectedRightId: null,
-  memorizeWrongFlash: null, // { leftId, rightId } briefly, while a wrong guess flashes red
+  memorizeLeftOrder: [], // ids, fixed reference order (never reordered)
+  memorizeRightOrder: [], // ids, the user's draggable guess order -- row i pairs left[i] with right[i]
+  memorizeLockedIds: [], // ids confirmed correct by Check, frozen in place
+  memorizeJustWrongIds: [], // ids that were wrong on the last Check, briefly flashed red
   memorizeLoading: false,
 };
 
@@ -1064,10 +1062,14 @@ function bookOrderIndex(bookName) {
 }
 
 // ---------- Memorize (verse-matching game) ----------
-// A tap-to-match game: pick a verse card on the left, then the target on the
-// right you think it belongs to. Two modes share the same mechanics but pull
-// from different pools/labels -- "reference" (VERSE_OF_DAY_REFS, labeled by
-// book+chapter) and "speaker" (VERSE_SPEAKERS, labeled by who said it).
+// A row-based drag-to-reorder game: the left column is a fixed reference
+// order of verses; the right column holds their targets (reference or
+// speaker, depending on mode), shuffled -- drag right-side cards to reorder
+// them until each row looks right, then press Check. Rows that line up get
+// locked in place; the rest stay draggable for another attempt. Two modes
+// share the same mechanics but pull from different pools/labels --
+// "reference" (VERSE_OF_DAY_REFS, labeled by book+chapter) and "speaker"
+// (VERSE_SPEAKERS, labeled by who said it).
 
 const MEMORIZE_ROUND_SIZE = 5;
 
@@ -1077,8 +1079,7 @@ function memorizeLabelOf(mode, entry) {
 
 // Picks ROUND_SIZE entries with distinct labels -- necessary for "speaker"
 // mode, where several verses can share the same speaker (e.g. several Jesus
-// quotes), which would otherwise make two left cards legitimately match the
-// same right card.
+// quotes), which would otherwise make two rows legitimately share a target.
 function pickMemorizeRound(mode) {
   const pool = mode === "speaker" ? VERSE_SPEAKERS : VERSE_OF_DAY_REFS;
   const shuffled = pool.slice().sort(() => Math.random() - 0.5);
@@ -1112,12 +1113,10 @@ function setMemorizeMode(mode) {
 async function startMemorizeRound() {
   const picked = pickMemorizeRound(state.memorizeMode);
   state.memorizeRound = picked.map((p, id) => ({ id, ...p, text: null }));
-  state.memorizeLeftOrder = shuffledIds(picked.length);
-  state.memorizeRightOrder = shuffledIds(picked.length);
-  state.memorizeMatchedIds = [];
-  state.memorizeSelectedLeftId = null;
-  state.memorizeSelectedRightId = null;
-  state.memorizeWrongFlash = null;
+  state.memorizeLeftOrder = shuffledIds(picked.length); // fixed reference order, never reordered
+  state.memorizeRightOrder = shuffledIds(picked.length); // the user's draggable guess order
+  state.memorizeLockedIds = [];
+  state.memorizeJustWrongIds = [];
   state.memorizeLoading = true;
   render();
 
@@ -1136,46 +1135,92 @@ async function startMemorizeRound() {
   render();
 }
 
-function selectMemorizeCard(side, id) {
-  if (state.memorizeMatchedIds.includes(id) || state.memorizeWrongFlash) return;
-  if (side === "left") {
-    state.memorizeSelectedLeftId = state.memorizeSelectedLeftId === id ? null : id;
-  } else {
-    state.memorizeSelectedRightId = state.memorizeSelectedRightId === id ? null : id;
-  }
+// A row is "correct" when the same id sits at the same index in both the
+// fixed left order and the user's current right order.
+function checkMemorizeMatches() {
+  const newlyCorrect = [];
+  const wrong = [];
+  state.memorizeLeftOrder.forEach((leftId, i) => {
+    if (state.memorizeLockedIds.includes(leftId)) return;
+    if (state.memorizeRightOrder[i] === leftId) newlyCorrect.push(leftId);
+    else wrong.push(leftId);
+  });
+  state.memorizeLockedIds.push(...newlyCorrect);
+  state.memorizeJustWrongIds = wrong;
   render();
-
-  const { memorizeSelectedLeftId: leftId, memorizeSelectedRightId: rightId } = state;
-  if (leftId == null || rightId == null) return;
-
-  if (leftId === rightId) {
-    state.memorizeMatchedIds.push(leftId);
-    state.memorizeSelectedLeftId = null;
-    state.memorizeSelectedRightId = null;
-    render();
-  } else {
-    state.memorizeWrongFlash = { leftId, rightId };
-    render();
+  if (wrong.length) {
     setTimeout(() => {
-      state.memorizeWrongFlash = null;
-      state.memorizeSelectedLeftId = null;
-      state.memorizeSelectedRightId = null;
+      state.memorizeJustWrongIds = [];
       render();
-    }, 700);
+    }, 900);
   }
 }
 
-function memorizeCardClass(side, id) {
-  const classes = ["memorize-card"];
-  const selectedId = side === "left" ? state.memorizeSelectedLeftId : state.memorizeSelectedRightId;
-  if (state.memorizeMatchedIds.includes(id)) classes.push("matched");
-  else if (state.memorizeWrongFlash && state.memorizeWrongFlash[side + "Id"] === id) classes.push("wrong");
-  else if (selectedId === id) classes.push("selected");
-  return classes.join(" ");
+// ---- Drag-to-reorder for the right column (pointer events: mouse + touch) ----
+
+let memorizeDrag = null; // { pointerId, cardEl, rowIndex }
+
+function onMemorizeRightPointerDown(e) {
+  const card = e.currentTarget;
+  if (card.classList.contains("locked")) return;
+  card.setPointerCapture(e.pointerId);
+  memorizeDrag = {
+    pointerId: e.pointerId,
+    cardEl: card,
+    rowIndex: Number(card.dataset.memorizeRowIndex),
+    startX: e.clientX,
+    startY: e.clientY,
+  };
+  card.classList.add("dragging");
+  // So elementFromPoint below finds the card *underneath* the drag instead of
+  // hitting this element itself (which now visually sits at the pointer).
+  card.style.pointerEvents = "none";
+  card.addEventListener("pointermove", onMemorizeRightPointerMove);
+  card.addEventListener("pointerup", onMemorizeRightPointerUp);
+  card.addEventListener("pointercancel", onMemorizeRightPointerUp);
+  e.preventDefault();
+}
+
+function memorizeDropTargetAt(x, y) {
+  const under = document.elementFromPoint(x, y);
+  const target = under && under.closest(".memorize-card-right");
+  if (!target || target === memorizeDrag.cardEl || target.classList.contains("locked")) return null;
+  return target;
+}
+
+function onMemorizeRightPointerMove(e) {
+  if (!memorizeDrag || e.pointerId !== memorizeDrag.pointerId) return;
+  const dx = e.clientX - memorizeDrag.startX;
+  const dy = e.clientY - memorizeDrag.startY;
+  memorizeDrag.cardEl.style.transform = `translate(${dx}px, ${dy}px)`;
+
+  document.querySelectorAll(".memorize-card-right.drop-target").forEach((el) => el.classList.remove("drop-target"));
+  const target = memorizeDropTargetAt(e.clientX, e.clientY);
+  if (target) target.classList.add("drop-target");
+}
+
+function onMemorizeRightPointerUp(e) {
+  if (!memorizeDrag || e.pointerId !== memorizeDrag.pointerId) return;
+  const { cardEl, rowIndex } = memorizeDrag;
+  const target = memorizeDropTargetAt(e.clientX, e.clientY);
+
+  if (target) {
+    const targetRowIndex = Number(target.dataset.memorizeRowIndex);
+    const tmp = state.memorizeRightOrder[rowIndex];
+    state.memorizeRightOrder[rowIndex] = state.memorizeRightOrder[targetRowIndex];
+    state.memorizeRightOrder[targetRowIndex] = tmp;
+  }
+
+  cardEl.removeEventListener("pointermove", onMemorizeRightPointerMove);
+  cardEl.removeEventListener("pointerup", onMemorizeRightPointerUp);
+  cardEl.removeEventListener("pointercancel", onMemorizeRightPointerUp);
+  memorizeDrag = null;
+  render(); // rebuilds the DOM fresh, so the dragged card's inline transform/style goes away with it
 }
 
 function renderMemorizeView() {
-  const allMatched = state.memorizeRound.length > 0 && state.memorizeMatchedIds.length === state.memorizeRound.length;
+  const total = state.memorizeRound.length;
+  const allLocked = total > 0 && state.memorizeLockedIds.length === total;
 
   const modeRow = `
     <div class="memorize-mode-row">
@@ -1189,7 +1234,7 @@ function renderMemorizeView() {
     return `
       <div class="memorize-view">
         <h1 class="dashboard-title">Memorize</h1>
-        <p class="dashboard-sub">${state.memorizeMode === "speaker" ? "Match each verse to who said it." : "Match each verse to where it's from."}</p>
+        <p class="dashboard-sub">${state.memorizeMode === "speaker" ? "Drag each verse's speaker into line, then check." : "Drag each verse's reference into line, then check."}</p>
         ${modeRow}
         <p class="status-msg">Loading verses…</p>
       </div>
@@ -1199,34 +1244,39 @@ function renderMemorizeView() {
   const byId = {};
   state.memorizeRound.forEach((e) => (byId[e.id] = e));
 
-  const leftCards = state.memorizeLeftOrder
-    .map((id) => {
-      const e = byId[id];
-      return `<button class="${memorizeCardClass("left", id)}" data-memorize-side="left" data-memorize-id="${id}">&ldquo;${escapeHtml(e.text)}&rdquo;</button>`;
-    })
-    .join("");
-
-  const rightCards = state.memorizeRightOrder
-    .map((id) => {
-      const e = byId[id];
-      return `<button class="${memorizeCardClass("right", id)}" data-memorize-side="right" data-memorize-id="${id}">${escapeHtml(e.label)}</button>`;
+  const rows = state.memorizeLeftOrder
+    .map((leftId, i) => {
+      const left = byId[leftId];
+      const rightId = state.memorizeRightOrder[i];
+      const right = byId[rightId];
+      const locked = state.memorizeLockedIds.includes(leftId);
+      const justWrong = state.memorizeJustWrongIds.includes(leftId);
+      const rightClass = ["memorize-card", "memorize-card-right", locked ? "locked" : "", justWrong ? "just-wrong" : ""]
+        .filter(Boolean)
+        .join(" ");
+      return `
+        <div class="memorize-row">
+          <div class="memorize-card memorize-card-left${locked ? " locked" : ""}">&ldquo;${escapeHtml(left.text)}&rdquo;</div>
+          <div class="${rightClass}" data-memorize-right-id="${rightId}" data-memorize-row-index="${i}">${escapeHtml(right.label)}</div>
+        </div>
+      `;
     })
     .join("");
 
   return `
     <div class="memorize-view">
       <h1 class="dashboard-title">Memorize</h1>
-      <p class="dashboard-sub">${state.memorizeMode === "speaker" ? "Match each verse to who said it." : "Match each verse to where it's from."}</p>
+      <p class="dashboard-sub">${state.memorizeMode === "speaker" ? "Drag each verse's speaker into line, then check." : "Drag each verse's reference into line, then check."}</p>
       ${modeRow}
       ${
-        allMatched
-          ? `<div class="memorize-complete">🎉 All ${state.memorizeRound.length} matched! <button class="memorize-new-round-btn" data-memorize-new-round>Play another round</button></div>`
-          : `<div class="memorize-progress">${state.memorizeMatchedIds.length} / ${state.memorizeRound.length} matched</div>`
+        allLocked
+          ? `<div class="memorize-complete">🎉 All ${total} matched! <button class="memorize-new-round-btn" data-memorize-new-round>Play another round</button></div>`
+          : `<div class="memorize-progress">
+               <span>${state.memorizeLockedIds.length} / ${total} locked in</span>
+               <button class="memorize-check-btn" data-memorize-check>Check</button>
+             </div>`
       }
-      <div class="memorize-grid">
-        <div class="memorize-col">${leftCards}</div>
-        <div class="memorize-col">${rightCards}</div>
-      </div>
+      <div class="memorize-rows">${rows}</div>
     </div>
   `;
 }
@@ -1538,8 +1588,11 @@ function attachHandlers() {
   document.querySelectorAll("[data-memorize-new-round]").forEach((btn) => {
     btn.addEventListener("click", () => startMemorizeRound());
   });
-  document.querySelectorAll("[data-memorize-side]").forEach((btn) => {
-    btn.addEventListener("click", () => selectMemorizeCard(btn.dataset.memorizeSide, Number(btn.dataset.memorizeId)));
+  document.querySelectorAll("[data-memorize-check]").forEach((btn) => {
+    btn.addEventListener("click", () => checkMemorizeMatches());
+  });
+  document.querySelectorAll(".memorize-card-right").forEach((card) => {
+    card.addEventListener("pointerdown", onMemorizeRightPointerDown);
   });
 
   document.querySelectorAll("[data-dash-action]").forEach((btn) => {

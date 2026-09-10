@@ -598,24 +598,41 @@ h1.chapter-title {
   font-weight: 700;
 }
 
-.memorize-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  align-items: start;
+.memorize-check-btn {
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-radius: 999px;
+  padding: 7px 16px;
+  cursor: pointer;
 }
 
-@media (max-width: 560px) {
-  .memorize-grid { grid-template-columns: 1fr; }
-}
+.memorize-check-btn:hover { opacity: 0.9; }
 
-.memorize-col {
+/* Each row is its own flex container so the verse card and its target card
+   stretch to the same (taller-of-the-two) height automatically -- no manual
+   height measuring needed for the columns to line up. */
+.memorize-rows {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
+.memorize-row {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+@media (max-width: 560px) {
+  .memorize-row { flex-direction: column; gap: 6px; }
+}
+
 .memorize-card {
+  flex: 1;
   font-family: "Newsreader", Georgia, serif;
   font-size: 0.92rem;
   line-height: 1.45;
@@ -625,26 +642,49 @@ h1.chapter-title {
   color: var(--text);
   border-radius: 12px;
   padding: 12px 14px;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, opacity 0.2s ease;
+  display: flex;
+  align-items: center;
 }
 
-.memorize-card:hover { border-color: var(--accent); }
+.memorize-card-left {
+  color: var(--text-muted);
+}
 
-.memorize-card.selected {
+.memorize-card-right {
+  cursor: grab;
+  user-select: none;
+  touch-action: none; /* so a drag isn't hijacked by the page's own touch-scroll */
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-weight: 700;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.memorize-card-right:hover:not(.locked) { border-color: var(--accent); }
+
+.memorize-card-right.dragging {
+  cursor: grabbing;
+  box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.35);
+  z-index: 5;
+  position: relative;
+}
+
+.memorize-card-right.drop-target {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  border-style: dashed;
 }
 
-.memorize-card.matched {
+.memorize-card-right.locked {
+  cursor: default;
   border-color: #4a8f45;
   background: var(--gold-soft);
-  color: var(--text-muted);
-  cursor: default;
-  opacity: 0.75;
 }
 
-.memorize-card.wrong {
+.memorize-card.locked {
+  border-color: #4a8f45;
+  opacity: 0.7;
+}
+
+.memorize-card-right.just-wrong {
   border-color: #b1495e;
   background: #b1495e22;
 }
