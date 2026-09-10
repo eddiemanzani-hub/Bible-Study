@@ -40,7 +40,13 @@ const state = {
   readingFontSize: savedReadingSettings.fontSize || "md", // "sm" | "md" | "lg" | "xl"
   readingColorTheme: savedReadingSettings.colorTheme || "default", // "default" | "sepia" | "contrast" | "soft"
   readingSpacing: savedReadingSettings.spacing || "normal", // "compact" | "normal" | "relaxed"
+  appTheme: localStorage.getItem("bsa:appTheme") || null, // "light" | "dark" | null (null = follow system)
 };
+
+// Applied immediately (before the first render, and before <body> even
+// exists yet -- these are the first lines app.js runs) so an explicit
+// Light/Dark choice takes effect with no flash of the other theme.
+if (state.appTheme) document.documentElement.setAttribute("data-theme", state.appTheme);
 
 const debounceTimers = {};
 function debounce(key, fn, delay = 400) {
@@ -331,6 +337,10 @@ const READING_SPACINGS = [
   { id: "normal", label: "Normal" },
   { id: "relaxed", label: "Relaxed" },
 ];
+const APP_THEMES = [
+  { id: "light", label: "Light" },
+  { id: "dark", label: "Dark" },
+];
 
 function openSettings() {
   state.showSettings = true;
@@ -344,14 +354,23 @@ function closeSettings() {
 
 function applyReadingSetting(key, value) {
   state[key] = value;
-  localStorage.setItem(
-    "bsa:readingSettings",
-    JSON.stringify({
-      fontSize: state.readingFontSize,
-      colorTheme: state.readingColorTheme,
-      spacing: state.readingSpacing,
-    })
-  );
+  if (key === "appTheme") {
+    // The app-wide Light/Dark choice is a separate concern from the reading
+    // font/color/spacing blob below -- it's applied as a data-theme
+    // attribute (see the token overrides in styles.css) rather than a class
+    // scoped to the chapter text.
+    localStorage.setItem("bsa:appTheme", value);
+    document.documentElement.setAttribute("data-theme", value);
+  } else {
+    localStorage.setItem(
+      "bsa:readingSettings",
+      JSON.stringify({
+        fontSize: state.readingFontSize,
+        colorTheme: state.readingColorTheme,
+        spacing: state.readingSpacing,
+      })
+    );
+  }
   render();
 }
 
@@ -371,6 +390,10 @@ function renderSettingsOverlay() {
         <div class="settings-head">
           <span class="settings-title">Reading Settings</span>
           <button class="settings-close" data-settings-close aria-label="Close">&times;</button>
+        </div>
+        <div class="settings-group">
+          <div class="settings-label">Appearance</div>
+          <div class="settings-opt-row">${renderSettingsOptionRow(APP_THEMES, "appTheme", state.appTheme)}</div>
         </div>
         <div class="settings-group">
           <div class="settings-label">Font size</div>

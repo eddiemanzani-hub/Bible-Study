@@ -1,12 +1,21 @@
+/* "Ink & Verse" palette: deep ink-blue + gilded gold in place of the original
+   cream-and-brown. --accent drives buttons/nav/active states throughout;
+   --gold is reserved for the few things worth setting apart (verse numbers,
+   the dashboard's quiz ring, the word being read aloud). Light values live
+   here in the bare :root; the dark media query and [data-theme] blocks below
+   redefine the same token set -- see the three-state pattern this depends on
+   in the comments there. */
 :root {
-  --bg: #faf7f0;
+  --bg: #f3f4f9;
   --bg-elevated: #ffffff;
-  --text: #2b2620;
-  --text-muted: #7a7264;
-  --border: #e5ddcc;
-  --accent: #7a5c3e;
+  --text: #1c2333;
+  --text-muted: #5b6478;
+  --border: #dee2ed;
+  --accent: #2f4374;
   --accent-contrast: #ffffff;
-  --focus-ring: #b08d5b;
+  --focus-ring: #4a5f97;
+  --gold: #b9862f;
+  --gold-soft: #f4e6c8;
 
   --hl-yellow: #fff3a3;
   --hl-green: #c7e8c0;
@@ -15,16 +24,21 @@
   --hl-purple: #ddd0f0;
 }
 
+/* Followed when the user hasn't made an explicit choice in Settings (no
+   [data-theme] stamp on <html>) and their OS/browser prefers dark. Guarded
+   so an explicit "Light" choice always wins even on a dark system. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1c1a17;
-    --bg-elevated: #262320;
-    --text: #ece6da;
-    --text-muted: #a89e8c;
-    --border: #3a352d;
-    --accent: #d3b27c;
-    --accent-contrast: #1c1a17;
-    --focus-ring: #d3b27c;
+  :root:not([data-theme="light"]) {
+    --bg: #0c0e14;
+    --bg-elevated: #1a1f2c;
+    --text: #e8eaf2;
+    --text-muted: #9ba3ba;
+    --border: #2b3140;
+    --accent: #8aa0de;
+    --accent-contrast: #0c0e14;
+    --focus-ring: #8aa0de;
+    --gold: #e0bd74;
+    --gold-soft: #3a3120;
 
     --hl-yellow: #6b5f1f;
     --hl-green: #3d5a3a;
@@ -34,6 +48,27 @@
   }
 }
 
+/* An explicit "Dark" choice in Settings (see the Appearance group in
+   renderSettingsOverlay, app.js) wins regardless of OS preference. */
+:root[data-theme="dark"] {
+  --bg: #0c0e14;
+  --bg-elevated: #1a1f2c;
+  --text: #e8eaf2;
+  --text-muted: #9ba3ba;
+  --border: #2b3140;
+  --accent: #8aa0de;
+  --accent-contrast: #0c0e14;
+  --focus-ring: #8aa0de;
+  --gold: #e0bd74;
+  --gold-soft: #3a3120;
+
+  --hl-yellow: #6b5f1f;
+  --hl-green: #3d5a3a;
+  --hl-blue: #35516b;
+  --hl-pink: #6a3c49;
+  --hl-purple: #4a3d63;
+}
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -41,7 +76,7 @@ html, body {
   padding: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  font-family: "Newsreader", Georgia, "Iowan Old Style", "Palatino Linotype", serif;
   line-height: 1.6;
   /* The collapsing header (see header.top-bar) intentionally shrinks while
      the user is scrolled into a chapter. Without this, the browser's scroll
@@ -54,7 +89,7 @@ html, body {
 body { min-height: 100vh; }
 
 button, select, textarea, input {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 a { color: var(--accent); }
@@ -164,7 +199,7 @@ header.top-bar.scrolled .picker-row {
   flex-direction: column;
   gap: 4px;
   margin-top: 10px;
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 .header-progress.collapsed {
@@ -288,7 +323,7 @@ h1.chapter-title {
   border-radius: 12px;
   padding: 10px 14px;
   margin-bottom: 20px;
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   /* Docks directly under the sticky header (whether expanded or scroll-
      collapsed -- see --header-h, kept in sync by updateHeaderHeightVar in
      app.js) so the read-aloud/speed controls stay reachable while scrolling
@@ -364,7 +399,7 @@ h1.chapter-title {
 }
 
 .dashboard-sub {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--text-muted);
   margin: 0 0 32px;
 }
@@ -387,7 +422,7 @@ h1.chapter-title {
   border: 1px solid transparent;
   border-radius: 16px;
   cursor: pointer;
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 .dash-ring-btn:hover {
@@ -430,7 +465,7 @@ h1.chapter-title {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: Georgia, "Iowan Old Style", serif;
+  font-family: "Newsreader", Georgia, "Iowan Old Style", serif;
   font-size: 1.35rem;
   font-weight: 700;
   color: var(--text);
@@ -535,7 +570,7 @@ h1.chapter-title {
 
 .verse-num-inline {
   font-weight: 700;
-  color: var(--accent);
+  color: var(--gold);
   font-size: 0.75em;
   margin-right: 2px;
   /* Deliberately selectable (not user-select: none): on touch, a long-press
@@ -570,7 +605,7 @@ h1.chapter-title {
 .note-indicator:hover { opacity: 1; }
 
 .chapter-hint {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.8rem;
   color: var(--text-muted);
   font-style: italic;
@@ -620,7 +655,7 @@ h1.chapter-title {
 }
 
 .popup-action-btn {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.82rem;
   text-align: left;
   border: 1px solid var(--border);
@@ -661,7 +696,7 @@ h1.chapter-title {
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg-elevated);
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.88rem;
   line-height: 1.55;
   text-indent: 0;
@@ -737,7 +772,7 @@ h1.chapter-title {
 }
 
 .note-box-label {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-weight: 600;
   font-size: 0.82rem;
   color: var(--accent);
@@ -751,7 +786,7 @@ h1.chapter-title {
 }
 
 .note-close-btn {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.72rem;
   color: var(--text-muted);
   background: none;
@@ -792,7 +827,7 @@ h1.chapter-title {
 }
 
 .delete-note-btn {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.72rem;
   color: #b1495e;
   background: none;
@@ -829,7 +864,7 @@ section.reflection > p.hint {
 }
 
 .quiz-progress {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.85rem;
   color: var(--text-muted);
   margin-bottom: 16px;
@@ -841,7 +876,7 @@ section.reflection > p.hint {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-weight: 600;
   font-size: 1rem;
   background: var(--bg-elevated);
@@ -859,7 +894,7 @@ section.reflection > p.hint {
 }
 
 .quiz-clear-btn {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-weight: 500;
   font-size: 0.82rem;
   border: 1px solid var(--border);
@@ -892,7 +927,7 @@ section.reflection > p.hint {
 }
 
 .quiz-verse-tag {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.78rem;
   color: var(--text-muted);
 }
@@ -904,7 +939,7 @@ section.reflection > p.hint {
 }
 
 .quiz-option-btn {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.92rem;
   text-align: left;
   border: 1px solid var(--border);
@@ -934,7 +969,7 @@ section.reflection > p.hint {
 
 .quiz-feedback {
   margin-top: 10px;
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.88rem;
   font-weight: 600;
 }
@@ -1017,7 +1052,7 @@ section.reflection > p.hint {
 }
 
 .note-card .note-text {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.92rem;
   white-space: pre-wrap;
   margin-top: 6px;
@@ -1025,7 +1060,7 @@ section.reflection > p.hint {
 
 .note-card .qa-item {
   margin-top: 8px;
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.9rem;
 }
 
@@ -1033,7 +1068,7 @@ section.reflection > p.hint {
 .note-card .qa-item .a { white-space: pre-wrap; }
 
 .char-progress-banner {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-weight: 600;
   font-size: 0.95rem;
   background: var(--bg-elevated);
@@ -1049,7 +1084,7 @@ section.reflection > p.hint {
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 16px;
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 .char-filter-row select {
@@ -1097,7 +1132,7 @@ section.reflection > p.hint {
 }
 
 .char-met-badge {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.7rem;
   font-weight: 600;
   padding: 2px 9px;
@@ -1154,7 +1189,7 @@ section.reflection > p.hint {
 }
 
 .progress-summary-card .hint {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.8rem;
   color: var(--text-muted);
   margin: 4px 0 0;
@@ -1176,7 +1211,7 @@ section.reflection > p.hint {
 }
 
 .book-progress-name {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.85rem;
   width: 130px;
   flex-shrink: 0;
@@ -1208,7 +1243,7 @@ section.reflection > p.hint {
   padding: 8px 14px;
   cursor: pointer;
   font-size: 0.85rem;
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 .data-tools button:hover { border-color: var(--accent); color: var(--accent); }
@@ -1218,7 +1253,7 @@ footer.app-footer {
   color: var(--text-muted);
   font-size: 0.75rem;
   margin-top: 50px;
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 /* Dictionary lookup popup (select a word in a verse) */
@@ -1233,7 +1268,7 @@ footer.app-footer {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   padding: 12px 14px;
   z-index: 1000;
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.85rem;
   color: var(--text);
 }
@@ -1248,7 +1283,7 @@ footer.app-footer {
 .dict-word {
   font-weight: 700;
   font-size: 1rem;
-  font-family: Georgia, "Iowan Old Style", serif;
+  font-family: "Newsreader", Georgia, "Iowan Old Style", serif;
 }
 
 .dict-close {
@@ -1339,7 +1374,7 @@ footer.app-footer {
 .votd-close:hover { color: var(--text); }
 
 .votd-welcome {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-muted);
@@ -1349,7 +1384,7 @@ footer.app-footer {
 }
 
 .votd-label {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-weight: 700;
   font-size: 1.15rem;
   color: var(--accent);
@@ -1364,7 +1399,7 @@ footer.app-footer {
 }
 
 .votd-ref {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-weight: 600;
   font-size: 0.95rem;
   color: var(--text-muted);
@@ -1380,7 +1415,7 @@ footer.app-footer {
 
 .votd-find-btn,
 .votd-continue-btn {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-weight: 600;
   font-size: 0.9rem;
   border-radius: 999px;
@@ -1403,7 +1438,7 @@ footer.app-footer {
 .votd-continue-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 .votd-loading {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
   font-style: italic;
   color: var(--text-muted);
   padding: 20px 0;
@@ -1430,7 +1465,7 @@ footer.app-footer {
   width: 100%;
   padding: 20px 22px 24px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Manrope", -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 .settings-head {
@@ -1443,7 +1478,7 @@ footer.app-footer {
 }
 
 .settings-title {
-  font-family: Georgia, "Iowan Old Style", serif;
+  font-family: "Newsreader", Georgia, "Iowan Old Style", serif;
   font-weight: 700;
   font-size: 1.15rem;
 }
